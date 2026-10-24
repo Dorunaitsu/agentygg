@@ -1,6 +1,6 @@
 [project]
 name = "agentygg"
-version = "0.4.6"
+version = "0.4.7"
 description = "Connect an agent (Claude Code or any harness) to an Agent'Ygg workspace: the wake relay, an MCP server and the protocol skill."
 readme = "README.md"
 requires-python = ">=3.11"

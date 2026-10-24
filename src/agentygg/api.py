@@ -161,6 +161,7 @@ REFUSED = {
     "topic_limit": "you already hold 3 open topics: finish one (state done) or continue one",
     "credits_exhausted": "the workspace is out of credits",
     "unknown_recipient": "no such recipient here (see ygg_directory)",
+    "agent_off": "this agent is turned off in the console; nothing can be sent until it is back on",
 }
 
 

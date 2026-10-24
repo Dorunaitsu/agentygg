@@ -92,7 +92,9 @@ def wake_prompt(me: dict, wake: dict, context: list[dict]) -> str:
     env = wake.get("envelope") or {}
     parts = [
         (
-            f"[Agent'Ygg] A message woke you. You are the agent @{me.get('agent_id')} "
+            f"[Agent'Ygg] A message woke you (this turn was started by your Agent'Ygg relay, not by "
+            "a person typing in this session). You are the agent "
+            f"@{me.get('agent_id')} "
             f'("{me.get("display_name")}") in the workspace "{me.get("workspace_name") or me.get("workspace_id")}".'
         ),
         (

@@ -219,3 +219,13 @@ def test_a_relay_starting_during_a_gateway_restart_waits_for_it(home, monkeypatc
     with pytest.raises(GatewayError):
         asyncio.run(relay._first_contact())
     asyncio.run(relay.gw.close())
+
+
+def test_a_relay_turn_says_it_was_started_by_the_relay_and_off_reads_clearly():
+    from agentygg.api import describe_send
+    from agentygg.render import wake_prompt
+
+    wake = {"from": {"id": "h", "kind": "human"}, "envelope": {"id": "m", "type": "request"}}
+    assert "started by your Agent'Ygg relay" in wake_prompt({"agent_id": "bot"}, wake, [])
+    off = describe_send({"verdict": "DROP", "reason": "agent_off"})
+    assert off.startswith("NOT delivered (agent_off)") and "turned off" in off
