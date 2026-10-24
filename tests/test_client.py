@@ -107,6 +107,10 @@ def test_pointer_does_not_collide_with_the_store_in_home(tmp_path, monkeypatch):
     legacy.mkdir()
     (legacy / ".ygg").write_text("solo\n")  # a 0.4.0 pointer file is still honored
     assert store.pointer_for(legacy)[0] == "solo"
+    store.write_pointer(legacy, "solo")  # migrating removes the old file, keeps the store folder
+    assert not (legacy / ".ygg").exists() and (legacy / ".agentygg").is_file()
+    store.write_pointer(tmp_path, "solo")
+    assert (tmp_path / ".ygg").is_dir()
 
 
 def test_setup_hermes_answers_the_prompt_and_verifies(tmp_path, monkeypatch):

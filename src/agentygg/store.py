@@ -110,6 +110,9 @@ def pointer_for(start: Path | None = None) -> tuple[str, Path] | None:
 def write_pointer(directory: Path, agent_id: str) -> Path:
     f = directory / POINTER
     f.write_text(agent_id + "\n")
+    legacy = directory / LEGACY_POINTER
+    if legacy.is_file():  # a 0.4.0 pointer: migrated (never the ~/.ygg store folder)
+        legacy.unlink()
     return f
 
 
