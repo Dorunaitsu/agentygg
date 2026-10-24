@@ -103,10 +103,10 @@ def secure_tree() -> None:
     logs hold the full text of every message. Applied when a relay starts and at install, so
     folders made by older clients (umask 022, readable by everyone) are fixed too.
     YGG-SEC-2026-10-25-02. POSIX only: on Windows the user profile's ACL protects them."""
-    if os.name == "nt":
-        return
     for d in (logs_dir(), state_dir()):
-        d.mkdir(parents=True, exist_ok=True)
+        d.mkdir(parents=True, exist_ok=True)  # also on Windows: the service writes its log here
+        if os.name == "nt":
+            continue
         os.chmod(d, 0o700)
         for f in d.iterdir():
             if f.is_file():

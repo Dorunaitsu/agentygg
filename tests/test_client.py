@@ -169,7 +169,8 @@ def test_no_attribute_can_close_the_frame():
 
 def test_logs_and_state_are_private(tmp_path, monkeypatch):
     monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
-    store.logs_dir().mkdir(parents=True)
+    store.secure_tree()  # creates the folders on every OS (the Windows service needs them)
+    assert store.logs_dir().is_dir() and store.state_dir().is_dir()
     (store.logs_dir() / "bot.log").write_text("every message")
     os.chmod(store.logs_dir(), 0o755)
     store.secure_tree()
