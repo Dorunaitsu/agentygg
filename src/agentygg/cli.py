@@ -1,7 +1,8 @@
 """`ygg`: connect an agent to Agent'Ygg.
 
 ygg agent add <key>      store an agent key on this machine (once, from the console)
-ygg setup claude         wire this directory's Claude Code to the agent (MCP + skill)
+ygg setup claude         wire this directory's harness to the agent (MCP + skill); also
+                         codex, hermes, openclaw, mcp (any MCP-capable harness)
 ygg agent run            the relay: wake Claude Code here whenever the agent is pinged
 ygg relay install        the same relay as a background service (login, reboot, crash)
 ygg relay list           the relays on this machine and whether they are running
@@ -131,6 +132,18 @@ def cmd_agent_status(args) -> None:
     print(json.dumps(me, indent=2))
 
 
+def _harness_for(args, ident: store.Identity) -> tuple[str, str | None]:
+    """The harness to run: --harness, else the one `ygg setup` recorded for this agent, else
+    `command` when --cmd is given, else Claude Code."""
+    if args.harness:
+        return args.harness, args.harness_path
+    if args.cmd:
+        return "command", None
+    if ident.harness:
+        return ident.harness, args.harness_path or ident.harness_path or None
+    return "claude", args.harness_path
+
+
 def cmd_agent_run(args) -> None:
     from agentygg.relay import Relay
 
@@ -140,7 +153,18 @@ def cmd_agent_run(args) -> None:
     extra = list(args.harness_args or [])
     if extra[:1] == ["--"]:
         extra = extra[1:]
-    relay = Relay(ident, workdir, harness=args.harness, extra_args=extra)
+    try:
+        kind, hpath = _harness_for(args, ident)
+        relay = Relay(
+            ident,
+            workdir,
+            harness=kind,
+            harness_path=hpath,
+            command=args.cmd,
+            extra_args=extra,
+        )
+    except ValueError as e:
+        _fail(str(e))
     try:
         asyncio.run(relay.run())
     except KeyboardInterrupt:
@@ -165,10 +189,17 @@ def cmd_relay_install(args) -> None:
     extra = list(args.harness_args or [])
     if extra[:1] == ["--"]:
         extra = extra[1:]
+    from agentygg import harnesses
+
+    kind, hpath = _harness_for(args, ident)
     try:
-        path = service.install(ident.agent_id, workdir, extra)
-    except (RuntimeError, LookupError) as e:
+        described = harnesses.build(kind, hpath, args.cmd).describe()
+        path = service.install(
+            ident.agent_id, workdir, extra, harness=kind, harness_path=hpath, cmd=args.cmd
+        )
+    except (RuntimeError, LookupError, ValueError, FileNotFoundError) as e:
         _fail(str(e))
+    print(f"Harness: {described}")
     print(f"Relay for @{ident.agent_id} installed and started ({path}).")
     print(f"  works in   {workdir}")
     print("  starts     at login, after a reboot, and again if it crashes")
@@ -194,7 +225,7 @@ def cmd_relay_list(_args) -> None:
             if r.running and r.pid
             else ("running" if r.running else "stopped")
         )
-        print(f"@{r.agent_id:<20} {state:<20} {r.workdir}")
+        print(f"@{r.agent_id:<20} {state:<20} {r.harness or 'claude':<9} {r.workdir}")
 
 
 def _relay_target(args) -> str:
@@ -233,35 +264,114 @@ def cmd_relay_logs(args) -> None:
 # -- setup ------------------------------------------------------------------ #
 
 
-def cmd_setup_claude(args) -> None:
-    """Wire the current directory's Claude Code to the agent: the MCP server in `.mcp.json`,
-    the protocol skill in `.claude/skills/agentygg/`, and the `.ygg` pointer."""
-    ident = _identity(args)
-    root = Path.cwd()
-    store.write_pointer(root, ident.agent_id)
-
-    mcp_path = root / ".mcp.json"
-    cfg = json.loads(mcp_path.read_text()) if mcp_path.exists() else {}
-    cfg.setdefault("mcpServers", {})["agentygg"] = {
-        "command": "ygg",
-        "args": ["mcp"],
-        "env": {"YGG_AGENT_ID": ident.agent_id},
-    }
-    mcp_path.write_text(json.dumps(cfg, indent=2) + "\n")
-
+def _skill_text_full() -> str:
     from importlib import resources
 
-    skill_dir = root / ".claude" / "skills" / "agentygg"
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "SKILL.md").write_text(
-        resources.files("agentygg").joinpath("skill/SKILL.md").read_text()
+    return resources.files("agentygg").joinpath("skill/SKILL.md").read_text()
+
+
+def _write_skill(folder: Path) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "SKILL.md").write_text(_skill_text_full())
+    return folder
+
+
+def _ygg_cmd() -> str:
+    import shutil
+
+    found = shutil.which("ygg")
+    return str(Path(found).absolute()) if found else "ygg"
+
+
+def _mcp_json() -> str:
+    return json.dumps(
+        {"mcpServers": {"agentygg": {"command": _ygg_cmd(), "args": ["mcp"]}}}, indent=2
     )
+
+
+def cmd_setup(args) -> None:
+    """Wire this folder's agent into a harness: the `.ygg` pointer, the protocol skill where the
+    harness reads skills, and the `agentygg` MCP server in the harness' own config. The MCP
+    server finds the agent from the folder it runs in, so one entry serves every agent."""
+    import subprocess
+
+    from agentygg import harnesses
+
+    ident = _identity(args)
+    root = Path.cwd()
+    kind = args.setup_cmd
+    store.write_pointer(root, ident.agent_id)
+    if kind != "mcp":
+        ident.harness = kind
+        ident.harness_path = args.harness_path or ""
+        store.save(ident)
+    done = [".ygg                          which agent works here (no secret inside)"]
+    # The cross-harness skills location (agentskills.io): OpenClaw, Codex and others read it.
+    _write_skill(root / ".agents" / "skills" / "agentygg")
+    done.append(".agents/skills/agentygg/       the Agent'Ygg protocol skill")
+
+    def run(cmd: list[str]) -> bool:
+        r = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        return r.returncode == 0
+
+    if kind == "claude":
+        mcp_path = root / ".mcp.json"
+        cfg = json.loads(mcp_path.read_text()) if mcp_path.exists() else {}
+        cfg.setdefault("mcpServers", {})["agentygg"] = {
+            "command": "ygg",
+            "args": ["mcp"],
+            "env": {"YGG_AGENT_ID": ident.agent_id},
+        }
+        mcp_path.write_text(json.dumps(cfg, indent=2) + "\n")
+        _write_skill(root / ".claude" / "skills" / "agentygg")
+        done += [
+            ".mcp.json                     the agentygg MCP server for Claude Code",
+            ".claude/skills/agentygg/      the skill, where Claude Code reads it",
+        ]
+    elif kind == "codex":
+        try:
+            exe = harnesses.Codex(args.harness_path).exe()
+        except FileNotFoundError as e:
+            _fail(str(e))
+        run([exe, "mcp", "remove", "agentygg"])
+        if not run([exe, "mcp", "add", "agentygg", "--", _ygg_cmd(), "mcp"]):
+            _fail("`codex mcp add` failed; add the agentygg server by hand: " + _mcp_json())
+        done.append("~/.codex/config.toml          the agentygg MCP server (codex mcp add)")
+    elif kind == "hermes":
+        try:
+            exe = harnesses.Hermes(args.harness_path).exe()
+        except FileNotFoundError as e:
+            _fail(str(e))
+        run([exe, "mcp", "remove", "agentygg"])
+        if not run([exe, "mcp", "add", "agentygg", "--command", _ygg_cmd(), "--args", "mcp"]):
+            _fail(
+                "`hermes mcp add` failed; add it under mcp_servers in ~/.hermes/config.yaml: "
+                + _mcp_json()
+            )
+        hermes_home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+        _write_skill(hermes_home / "skills" / "agentygg")
+        done += [
+            "hermes config                 the agentygg MCP server (hermes mcp add)",
+            f"{hermes_home}/skills/agentygg/  the skill, where Hermes reads it",
+        ]
+    elif kind == "openclaw":
+        done.append("(the relay injects the agentygg MCP server into each OpenClaw run)")
+        print("For interactive OpenClaw sessions, also register the MCP server (see")
+        print("https://docs.openclaw.ai/cli/mcp) with this stdio entry:")
+        print(_mcp_json())
+    else:  # mcp: any MCP-capable harness
+        print("Add this stdio MCP server to your harness (most accept this JSON shape):")
+        print(_mcp_json())
+        print(
+            f"and point it at the skill in {root / '.agents' / 'skills' / 'agentygg' / 'SKILL.md'}"
+        )
     print(f"This directory now belongs to @{ident.agent_id}:")
-    print("  .ygg                          which agent works here (no secret inside)")
-    print("  .mcp.json                     the agentygg MCP server for Claude Code")
-    print("  .claude/skills/agentygg/      the Agent'Ygg protocol skill")
-    print("Now run `ygg agent run` here to answer pings automatically, or just use Claude Code:")
-    print("it can check its messages with the ygg_inbox tool.")
+    for line in done:
+        print("  " + line)
+    if kind == "mcp":
+        print("Then `ygg relay install --harness command --cmd '<your harness, one turn>'` here.")
+    else:
+        print("Now run `ygg relay install` here so the agent answers pings in the background.")
 
 
 # -- shell actions (any harness) --------------------------------------------- #
@@ -314,6 +424,23 @@ def cmd_skill(_args) -> None:
 # -- parser ------------------------------------------------------------------ #
 
 
+def _harness_opts(a: argparse.ArgumentParser) -> None:
+    from agentygg.harnesses import KINDS
+
+    a.add_argument(
+        "--harness",
+        choices=KINDS,
+        help=f"which agent runs each turn: {', '.join(KINDS)} (default: the one chosen with "
+        "`ygg setup <harness>`)",
+    )
+    a.add_argument("--harness-path", help="the harness executable, if not on PATH")
+    a.add_argument(
+        "--cmd",
+        help="with --harness command: the shell command run per wake (prompt on stdin and in "
+        "$YGG_PROMPT; answer with the agentygg MCP server or `ygg send`)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ygg", description="Connect an agent to Agent'Ygg.")
     p.add_argument("--version", action="version", version=f"agentygg {__version__}")
@@ -350,12 +477,13 @@ def build_parser() -> argparse.ArgumentParser:
     a = asub.add_parser(
         "run",
         help="the relay: wake the harness here whenever the agent is pinged",
-        description="Holds the agent's connection and runs one Claude Code turn per wake. Any "
-        "options after `--` are passed to Claude Code (for example a permission mode).",
+        description="Holds the agent's connection and runs one harness turn per wake (Claude "
+        "Code by default; --harness codex|hermes|openclaw|command). Options after `--` go to "
+        "the harness.",
     )
     a.add_argument("--agent")
     a.add_argument("--dir", help="working directory (default: the one bound to the agent)")
-    a.add_argument("--harness", default="claude", help="the Claude Code executable")
+    _harness_opts(a)
     a.add_argument("harness_args", nargs=argparse.REMAINDER)
     a.set_defaults(fn=cmd_agent_run)
 
@@ -364,12 +492,13 @@ def build_parser() -> argparse.ArgumentParser:
     a = rsub.add_parser(
         "install",
         help="run this directory's agent relay in the background, from now on",
-        description="Installs the relay as a login service (launchd on macOS, systemd on Linux): "
-        "it starts now, at every login and after a reboot, and is restarted if it crashes. "
-        "Options after `--` go to Claude Code.",
+        description="Installs the relay as a login service (launchd on macOS, systemd on Linux, "
+        "Task Scheduler on Windows): it starts now, at every login and after a reboot, and is "
+        "restarted if it crashes. Options after `--` go to the harness.",
     )
     a.add_argument("--agent")
     a.add_argument("--dir")
+    _harness_opts(a)
     a.add_argument("harness_args", nargs=argparse.REMAINDER)
     a.set_defaults(fn=cmd_relay_install)
     rsub.add_parser("list", help="relays on this machine").set_defaults(fn=cmd_relay_list)
@@ -389,9 +518,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("setup", help="wire a harness in this directory to the agent")
     ssub = s.add_subparsers(dest="setup_cmd", required=True)
-    a = ssub.add_parser("claude", help="Claude Code: .mcp.json + the skill + the .ygg pointer")
-    a.add_argument("--agent")
-    a.set_defaults(fn=cmd_setup_claude)
+    for name, hlp in (
+        ("claude", "Claude Code: .mcp.json + the skill + the .ygg pointer"),
+        ("codex", "OpenAI Codex CLI: codex mcp add + the skill"),
+        ("hermes", "Hermes Agent: hermes mcp add + the skill"),
+        ("openclaw", "OpenClaw: the skill (the relay injects the MCP server per run)"),
+        ("mcp", "any other MCP-capable harness: print the server entry + the skill"),
+    ):
+        a = ssub.add_parser(name, help=hlp)
+        a.add_argument("--agent")
+        a.add_argument("--harness-path", help="the harness executable, if not on PATH")
+        a.set_defaults(fn=cmd_setup)
 
     a = sub.add_parser("inbox", help="take what is waiting for the agent")
     a.add_argument("--agent")

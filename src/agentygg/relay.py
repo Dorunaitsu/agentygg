@@ -1,11 +1,11 @@
 """The relay (`ygg agent run`): what wakes an agent whose model only runs when asked to.
 
 It holds the agent's wake stream open (one live instance, the lease) and, for each wake the
-backend grants, runs one turn of the agent's harness in the agent's working directory, then
-waits again. Wakes are handled one at a time, in order. For Claude Code a turn is
-`claude -p <prompt> --resume <session>`: the same session is resumed from one wake to the
-next, so the agent remembers its earlier exchanges. The harness gets the `agentygg` MCP
-server (sharing this instance) to read, answer and ask.
+backend grants, runs one turn of the agent's harness (Claude Code, Codex, Hermes Agent,
+OpenClaw, or any command) in the agent's working directory, then waits again. Wakes are handled
+one at a time, in order. Harnesses that can resume a session resume the same one from wake to
+wake, so the agent remembers its earlier exchanges. The turn gets the `agentygg` MCP server,
+acting under this relay's lease (see `harnesses.py`).
 
 The relay never decides anything: the backend already judged every wake it receives, and
 whatever the agent sends back is judged again.
@@ -17,28 +17,27 @@ import asyncio
 import contextlib
 import json
 import os
-import shutil
-import sys
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agentygg import store
+from agentygg import harnesses, store
 from agentygg.api import Gateway, GatewayError
-from agentygg.render import skill_text, wake_prompt
+from agentygg.harnesses import TurnResult
+from agentygg.render import wake_prompt
+
+__all__ = ["Relay", "TurnResult", "log"]
 
 
 def log(msg: str) -> None:
     print(f"{time.strftime('%H:%M:%S')}  {msg}", flush=True)
 
 
-@dataclass
-class TurnResult:
-    ok: bool
-    session_id: str | None = None
-    summary: str = ""
-    seconds: float = 0.0
+def instance_path(agent_id: str) -> Path:
+    """Where a running relay publishes its instance nonce, so the MCP server or `ygg send`
+    started by ANY harness acts under the relay's lease (some harnesses do not pass their
+    environment on to MCP servers)."""
+    return store.state_dir() / f"{agent_id}.instance"
 
 
 @dataclass
@@ -48,18 +47,23 @@ class Relay:
     harness: str = "claude"
     extra_args: list[str] = field(default_factory=list)
     turn_timeout_s: float = 1800.0
-    # Testing / other harnesses: a full command to run instead of the Claude Code one; the
-    # prompt is passed on stdin and in YGG_PROMPT.
-    command: list[str] | None = None
+    harness_path: str | None = None
+    # `--harness command`: the shell command to run per wake. A list runs as-is (tests).
+    command: str | list[str] | None = None
 
     def __post_init__(self) -> None:
+        if isinstance(self.command, list):
+            self.h: harnesses.Harness = harnesses.Command(self.command)
+        else:
+            kind = "command" if self.command and self.harness == "claude" else self.harness
+            self.h = harnesses.build(kind, self.harness_path, self.command)
         self.gw = Gateway(self.identity)
         self.me: dict = {}
         self.context: list[dict] = []
         self.queue: asyncio.Queue[dict] = asyncio.Queue()
         self.turns = 0
 
-    # -- session memory (one Claude session per agent + directory) ---------- #
+    # -- session memory (one harness session per agent + directory) --------- #
 
     def _state_path(self) -> Path:
         return store.state_dir() / f"{self.identity.agent_id}.json"
@@ -69,126 +73,79 @@ class Relay:
         if not p.exists():
             return None
         data = json.loads(p.read_text())
-        return data.get("session_id") if data.get("workdir") == str(self.workdir) else None
+        same = (
+            data.get("workdir") == str(self.workdir)
+            and data.get("harness", "claude") == self.h.kind
+        )
+        return data.get("session_id") if same else None
 
     def _save_session(self, session_id: str) -> None:
         p = self._state_path()
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"session_id": session_id, "workdir": str(self.workdir)}))
+        p.write_text(
+            json.dumps(
+                {"session_id": session_id, "workdir": str(self.workdir), "harness": self.h.kind}
+            )
+        )
+
+    def _publish_instance(self) -> None:
+        p = instance_path(self.identity.agent_id)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"nonce": self.gw.nonce, "pid": os.getpid()}))
+
+    def _clear_instance(self) -> None:
+        with contextlib.suppress(OSError):
+            instance_path(self.identity.agent_id).unlink()
 
     # -- one turn ----------------------------------------------------------- #
 
-    def _env(self) -> dict[str, str]:
+    def _env(self, prompt: str) -> dict[str, str]:
         env = dict(os.environ)
         env["YGG_INSTANCE"] = self.gw.nonce  # the MCP server acts under OUR lease
         env["YGG_AGENT_ID"] = self.identity.agent_id
+        env["YGG_PROMPT"] = prompt
         env.pop("YGG_AGENT_KEY", None)
         return env
 
-    def _mcp_config(self) -> str:
-        cfg = {
-            "mcpServers": {
-                "agentygg": {
-                    "command": sys.executable,
-                    "args": ["-m", "agentygg.cli", "mcp"],
-                    "env": {"YGG_AGENT_ID": self.identity.agent_id, "YGG_INSTANCE": self.gw.nonce},
-                }
-            }
-        }
-        fd, path = tempfile.mkstemp(prefix="agentygg-mcp-", suffix=".json")
-        with os.fdopen(fd, "w") as f:
-            json.dump(cfg, f)
-        return path
-
-    def _harness_exe(self) -> str:
-        """The harness executable. A background service has a thin PATH (launchd does not read
-        ~/.zshrc), so look in the usual install places too."""
-        if os.path.isabs(self.harness) and os.access(self.harness, os.X_OK):
-            return self.harness
-        found = shutil.which(self.harness)
-        if found:
-            return found
-        home = Path.home()
-        for cand in (
-            home / ".local" / "bin" / self.harness,
-            home / ".claude" / "local" / self.harness,
-            Path("/opt/homebrew/bin") / self.harness,
-            Path("/usr/local/bin") / self.harness,
-        ):
-            if os.access(cand, os.X_OK):
-                return str(cand)
-        raise FileNotFoundError(
-            f"cannot find `{self.harness}` (Claude Code); reinstall the relay from a terminal "
-            "where it works, or pass --harness /full/path/to/claude"
-        )
-
-    def _claude_cmd(self, prompt: str, mcp_path: str, session: str | None) -> list[str]:
-        exe = self._harness_exe()
-        cmd = [
-            exe,
-            "-p",
-            prompt,
-            "--output-format",
-            "json",
-            "--mcp-config",
-            mcp_path,
-            "--allowedTools",
-            "mcp__agentygg",
-            "--append-system-prompt",
-            "You are connected to Agent'Ygg as an agent. Protocol:\n\n" + skill_text(),
-        ]
-        if session:
-            cmd += ["--resume", session]
-        return cmd + self.extra_args
-
-    async def _exec(self, cmd: list[str], prompt: str) -> tuple[int, str, str]:
-        env = self._env()
-        env["YGG_PROMPT"] = prompt
+    async def _exec(self, turn: harnesses.Turn, prompt: str) -> tuple[int, str, str]:
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
+            *turn.cmd,
             cwd=str(self.workdir),
-            env=env,
+            env=self._env(prompt),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            out, err = await asyncio.wait_for(
-                proc.communicate(prompt.encode() if self.command else None), self.turn_timeout_s
-            )
+            out, err = await asyncio.wait_for(proc.communicate(turn.stdin), self.turn_timeout_s)
         except TimeoutError:
             with contextlib.suppress(ProcessLookupError):
                 proc.kill()
             return 124, "", f"turn timed out after {self.turn_timeout_s:.0f}s"
         return proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
 
+    async def _attempt(self, prompt: str, session: str | None) -> TurnResult:
+        mcp = harnesses.mcp_spec(self.identity.agent_id, self.gw.nonce)
+        turn = self.h.prepare(prompt, mcp, session, self.extra_args, str(self.workdir))
+        try:
+            code, out, err = await self._exec(turn, prompt)
+        finally:
+            for path in turn.cleanup:
+                with contextlib.suppress(OSError):
+                    os.unlink(path)
+        return self.h.parse(code, out, err)
+
     async def run_turn(self, prompt: str) -> TurnResult:
         started = time.monotonic()
-        if self.command:
-            code, out, err = await self._exec(self.command, prompt)
-            return TurnResult(
-                code == 0, None, (out or err).strip()[:200], time.monotonic() - started
-            )
-        mcp_path = self._mcp_config()
-        try:
-            session = self._load_session()
-            code, out, err = await self._exec(self._claude_cmd(prompt, mcp_path, session), prompt)
-            if code != 0 and session:
-                # The saved session may be gone (cleared, other machine): start a fresh one.
-                code, out, err = await self._exec(self._claude_cmd(prompt, mcp_path, None), prompt)
-        finally:
-            with contextlib.suppress(OSError):
-                os.unlink(mcp_path)
-        seconds = time.monotonic() - started
-        try:
-            data = json.loads(out)
-        except json.JSONDecodeError:
-            return TurnResult(False, None, (err or out).strip()[-300:], seconds)
-        sid = data.get("session_id")
-        if sid:
-            self._save_session(sid)
-        ok = code == 0 and not data.get("is_error")
-        return TurnResult(ok, sid, str(data.get("result") or "").strip()[:200], seconds)
+        session = self._load_session() if self.h.resumable else None
+        result = await self._attempt(prompt, session)
+        if not result.ok and session:
+            # The saved session may be gone (cleared, other machine): start a fresh one.
+            result = await self._attempt(prompt, None)
+        if result.session_id and self.h.resumable:
+            self._save_session(result.session_id)
+        result.seconds = time.monotonic() - started
+        return result
 
     async def handle(self, wake: dict) -> None:
         env = wake.get("envelope") or {}
@@ -245,9 +202,9 @@ class Relay:
                     log(f"  turn crashed: {e!r}")
 
     async def run(self) -> None:
-        if not self.command:
-            log(f"harness: {self._harness_exe()}")  # fail now, not on the first wake
+        log(f"harness: {self.h.describe()}")  # fails now (not on the first wake) if missing
         self.me = await self.gw.me()
+        self._publish_instance()
         log(
             f'agent @{self.me["agent_id"]} in "{self.me.get("workspace_name") or self.me["workspace_id"]}", '
             f"working in {self.workdir}"
@@ -261,5 +218,6 @@ class Relay:
         finally:
             reader.cancel()
             worker.cancel()
+            self._clear_instance()
             await self.gw.release()
             await self.gw.close()

@@ -69,11 +69,13 @@ def test_relay_service_definitions(tmp_path, monkeypatch):
 
     monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(service, "_ygg_executable", lambda: "/opt/bin/ygg")
-    monkeypatch.setattr(service, "_harness_path", lambda harness="claude": "/opt/bin/claude")
+    monkeypatch.setattr(
+        service, "_harness_path", lambda harness="claude", path=None: "/opt/bin/claude"
+    )
     cmd = service.run_command("bot", tmp_path / "my proj", ["--model", "opus"])
     assert cmd.startswith("exec /opt/bin/ygg agent run --agent bot --dir ")
     assert "'" in cmd and cmd.endswith("-- --model opus")  # the spaced path is quoted
-    assert "--harness /opt/bin/claude" in cmd
+    assert "--harness claude --harness-path /opt/bin/claude" in cmd
 
     plist = service.launchd_plist("bot", tmp_path, cmd)
     assert plist["Label"] == "com.agentygg.relay.bot"

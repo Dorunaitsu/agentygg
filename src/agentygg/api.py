@@ -30,6 +30,31 @@ def _detail(r: httpx.Response) -> str:
         return r.text[:300]
 
 
+def _relay_nonce(agent_id: str) -> str | None:
+    """The instance nonce a running relay published for this agent (see relay.instance_path),
+    so tools started by a harness that does not pass its environment on still act under the
+    relay's lease instead of being refused as a second instance."""
+    from agentygg import store
+
+    p = store.state_dir() / f"{agent_id}.instance"
+    try:
+        data = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return None
+    pid = data.get("pid")
+    # On Windows os.kill(pid, 0) would SEND Ctrl+C (signal 0 is CTRL_C_EVENT there), so the
+    # liveness check is POSIX-only; a stale file only means the next call is refused as busy.
+    if isinstance(pid, int) and pid > 0 and os.name != "nt":
+        try:
+            os.kill(pid, 0)  # still running?
+        except ProcessLookupError:
+            return None
+        except (PermissionError, OSError):
+            pass
+    nonce = data.get("nonce")
+    return nonce if isinstance(nonce, str) else None
+
+
 class Gateway:
     """One live instance of an agent. `nonce` identifies this instance to the backend's lease;
     processes that act as the same instance (the relay and the MCP server it launches) share
@@ -37,7 +62,8 @@ class Gateway:
 
     def __init__(self, identity: Identity, nonce: str | None = None):
         self.identity = identity
-        self.nonce = nonce or os.environ.get("YGG_INSTANCE") or secrets.token_hex(8)
+        self.nonce = nonce or os.environ.get("YGG_INSTANCE") or _relay_nonce(identity.agent_id)
+        self.nonce = self.nonce or secrets.token_hex(8)
         self.base = identity.api.rstrip("/")
         self._http = httpx.AsyncClient(base_url=self.base, headers=self.headers, timeout=60)
 

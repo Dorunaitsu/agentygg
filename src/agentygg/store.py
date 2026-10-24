@@ -39,6 +39,10 @@ class Identity:
     api: str = DEFAULT_API
     display_name: str = ""
     workspace_name: str = ""
+    # The harness this agent runs on (set by `ygg setup <harness>`); the relay uses it when no
+    # --harness is given.
+    harness: str = ""
+    harness_path: str = ""
 
 
 def decode_key(key: str) -> tuple[str, str]:
@@ -68,7 +72,9 @@ def load(agent_id: str) -> Identity:
     path = agents_dir() / f"{agent_id}.json"
     if not path.exists():
         raise LookupError(f"no agent @{agent_id} on this machine (add it with: ygg agent add)")
-    return Identity(**json.loads(path.read_text()))
+    data = json.loads(path.read_text())
+    known = Identity.__dataclass_fields__
+    return Identity(**{k: v for k, v in data.items() if k in known})
 
 
 def all_ids() -> list[str]:
