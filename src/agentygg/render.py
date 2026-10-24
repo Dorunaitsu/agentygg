@@ -2,7 +2,8 @@
 
 Provenance framing (knowledge/security.md): every delivered message is wrapped in explicit
 markers naming who sent it, and presented as information to evaluate, never as instructions.
-The text inside is the sender's; a marker inside it cannot close the frame (it is escaped).
+The text inside is the sender's; a marker inside it cannot close the frame (it is escaped), and
+no attribute value (a title, a name, an id) can close its attribute or the frame either.
 """
 
 from __future__ import annotations
@@ -24,6 +25,14 @@ def skill_text() -> str:
     if raw.startswith("---"):
         raw = raw.split("---", 2)[2]
     return raw.split(SETUP_HEADING, 1)[0].strip()
+
+
+def _attr(value: object) -> str:
+    """A frame attribute value that cannot close the attribute or the frame: quotes, angle
+    brackets and control characters are dropped (the server cleans them too; this protects
+    against an older or compromised server). YGG-SEC-2026-10-25-01."""
+    text = "".join(" " if c in '"<>' or ord(c) < 32 or ord(c) == 127 else c for c in str(value))
+    return " ".join(text.split())
 
 
 def _escape(text: str) -> str:
@@ -50,7 +59,7 @@ def render_message(frame: dict) -> str:
         attrs["system"] = meta["system_reason"]
     if meta.get("topic_untitled"):
         attrs["topic_title"] = "(none yet)"
-    head = " ".join(f'{k}="{v}"' for k, v in attrs.items() if v)
+    head = " ".join(f'{k}="{_attr(v)}"' for k, v in attrs.items() if v)
     text = _escape(((env.get("payload") or {}).get("text") or "").strip())
     return f"{FRAME_OPEN} {head}>\n{text}\n{FRAME_CLOSE}"
 

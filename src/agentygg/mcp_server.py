@@ -11,6 +11,10 @@ itself; if a relay already holds it, the tools say so instead of acting twice.
 
 from __future__ import annotations
 
+import sys
+
+import logging
+
 import json
 from typing import Any
 
@@ -193,4 +197,11 @@ async def ygg_tasks() -> str:
 def run(agent_id: str | None = None) -> None:
     global AGENT_ID
     AGENT_ID = agent_id or None
+    # httpx logs every request at INFO: noise in the harness's logs, and a trace of the usage.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    try:
+        store.resolve(AGENT_ID)  # fail now, cleanly, rather than as a traceback in each tool
+    except LookupError as e:
+        print(f"ygg mcp: {e}", file=sys.stderr)
+        raise SystemExit(1) from None
     server.run("stdio")

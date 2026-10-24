@@ -94,6 +94,25 @@ def remove(agent_id: str) -> bool:
     return False
 
 
+def logs_dir() -> Path:
+    return home() / "logs"
+
+
+def secure_tree() -> None:
+    """Make the relay's logs and state private to this user (folders 0700, files 0600): the
+    logs hold the full text of every message. Applied when a relay starts and at install, so
+    folders made by older clients (umask 022, readable by everyone) are fixed too.
+    YGG-SEC-2026-10-25-02. POSIX only: on Windows the user profile's ACL protects them."""
+    if os.name == "nt":
+        return
+    for d in (logs_dir(), state_dir()):
+        d.mkdir(parents=True, exist_ok=True)
+        os.chmod(d, 0o700)
+        for f in d.iterdir():
+            if f.is_file():
+                os.chmod(f, 0o600)
+
+
 # -- live listening (`ygg listen`) -------------------------------------------- #
 
 # A live session that ran `ygg listen` less than this long ago still counts as listening: the

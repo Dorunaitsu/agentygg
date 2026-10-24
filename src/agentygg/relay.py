@@ -257,6 +257,7 @@ class Relay:
             backoff = min(backoff * 2, 60.0)
 
     async def run(self) -> None:
+        store.secure_tree()  # logs and state are private (they hold every message)
         log(f"harness: {self.h.describe()}")  # fails now (not on the first wake) if missing
         self.me = await self._first_contact()
         self._publish_instance()

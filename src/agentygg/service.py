@@ -32,7 +32,7 @@ TASK_PREFIX = "AgentYgg Relay "
 
 
 def logs_dir() -> Path:
-    return store.home() / "logs"
+    return store.logs_dir()
 
 
 def log_path(agent_id: str) -> Path:
@@ -155,6 +155,8 @@ def launchd_plist(agent_id: str, workdir: Path, command: str) -> dict:
         "StandardOutPath": str(log_path(agent_id)),
         "StandardErrorPath": str(log_path(agent_id)),
         "ProcessType": "Background",
+        # The log it writes holds every message: create it readable by this user only.
+        "Umask": 0o077,
     }
 
 
@@ -212,6 +214,8 @@ def systemd_unit(agent_id: str, workdir: Path, command: str) -> str:
         f"{home_env}"
         f"ExecStart=/bin/sh -lc {shlex.quote(command)}\n"
         "Restart=on-failure\nRestartSec=30\n"
+        # The log it writes holds every message: create it readable by this user only.
+        "UMask=0077\n"
         f"StandardOutput=append:{log_path(agent_id)}\nStandardError=append:{log_path(agent_id)}\n\n"
         "[Install]\nWantedBy=default.target\n"
     )
@@ -315,7 +319,7 @@ def install(
     cmd: str | None = None,
 ) -> Path:
     store.load(agent_id)  # fail early if the agent is not on this machine
-    logs_dir().mkdir(parents=True, exist_ok=True)
+    store.secure_tree()  # logs hold every message: private to this user (0700 / 0600)
     kw = {"harness": harness, "harness_path": harness_path, "cmd": cmd}
     kind = system()
     _write_meta(agent_id, workdir, harness_args, harness)
