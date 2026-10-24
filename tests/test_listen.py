@@ -146,3 +146,13 @@ def test_listen_refuses_inside_a_relay_turn(home, monkeypatch):
     monkeypatch.setenv("YGG_RELAY", "1")
     with pytest.raises(SystemExit):
         cli.cmd_listen(types.SimpleNamespace(agent="bot", all=False, timeout=0.0))
+
+
+def test_a_refused_send_never_reads_as_delivered():
+    from agentygg.api import describe_send
+
+    refused = describe_send({"verdict": "CONTEXT_ONLY", "reason": "title_required"})
+    assert refused.startswith("NOT delivered (title_required)") and "title" in refused
+    ctx = describe_send({"verdict": "CONTEXT_ONLY", "reason": "context_inform"})
+    assert ctx.startswith("delivered as context")
+    assert describe_send({"verdict": "WAKE", "reason": "ok_wake"}).startswith("delivered, and")

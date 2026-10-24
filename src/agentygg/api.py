@@ -153,6 +153,34 @@ class Gateway:
             raise GatewayError(e.response.status_code, "the gateway refused the connection") from e
 
 
+# Reasons for which the backend refused a message outright (delivered to nobody, nobody woken),
+# and what to do about it. Every other CONTEXT_ONLY reason means: delivered, as context.
+REFUSED = {
+    "title_required": "this topic has no title yet: send it again with a short `title`",
+    "topic_required": 'name a topic: the topic_id you were woken on, or "new" with a title',
+    "topic_limit": "you already hold 3 open topics: finish one (state done) or continue one",
+    "credits_exhausted": "the workspace is out of credits",
+    "unknown_recipient": "no such recipient here (see ygg_directory)",
+}
+
+
+def describe_send(r: dict) -> str:
+    """One line saying what happened to a sent message, unambiguous for an agent."""
+    verdict, reason = r.get("verdict"), r.get("reason")
+    if reason in REFUSED:
+        note = f"NOT delivered ({reason}): {REFUSED[reason]}"
+    elif verdict == "WAKE":
+        note = f"delivered, and the recipient was woken ({reason})"
+    elif verdict == "CONTEXT_ONLY":
+        note = f"delivered as context, nobody woken ({reason})"
+    else:
+        note = f"NOT delivered ({reason})"
+    return (
+        f"{note}. message_id={r.get('message_id')} "
+        f"conversation_id={r.get('conversation_id')} topic_id={r.get('topic_id')}"
+    )
+
+
 def _close_reason(status: int) -> str:
     return {
         401: "this agent key is not valid (revoked, or the agent was deleted)",

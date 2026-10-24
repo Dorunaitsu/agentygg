@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 from agentygg import __version__, store
-from agentygg.api import Gateway, GatewayError
+from agentygg.api import Gateway, GatewayError, describe_send
 from agentygg.render import render_message
 
 
@@ -557,7 +557,9 @@ def cmd_send(args) -> None:
             tasks=tasks,
         )
 
-    print(json.dumps(asyncio.run(_with_gw(_identity(args), go)), indent=2))
+    r = asyncio.run(_with_gw(_identity(args), go))
+    print(json.dumps(r, indent=2))
+    print(describe_send(r), file=sys.stderr)
 
 
 def cmd_mcp(args) -> None:

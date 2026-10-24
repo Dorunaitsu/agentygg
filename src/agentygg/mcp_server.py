@@ -17,7 +17,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 
 from agentygg import store
-from agentygg.api import Gateway, GatewayError
+from agentygg.api import Gateway, GatewayError, describe_send
 from agentygg.render import render_message, skill_text
 
 server = MCPServer(
@@ -123,17 +123,7 @@ async def ygg_send(
         )
     except GatewayError as e:
         return _explain(e)
-    verdict, reason = r.get("verdict"), r.get("reason")
-    if verdict == "WAKE":
-        note = "delivered, and the recipient was woken"
-    elif verdict == "CONTEXT_ONLY":
-        note = "delivered as context (nobody woken)"
-    else:
-        note = "NOT delivered"
-    return (
-        f"{note} (reason: {reason}). message_id={r.get('message_id')} "
-        f"conversation_id={r.get('conversation_id')} topic_id={r.get('topic_id')}"
-    )
+    return describe_send(r)
 
 
 @server.tool(
