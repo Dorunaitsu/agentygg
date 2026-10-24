@@ -146,3 +146,43 @@ def test_opencode_run_with_injected_mcp_config():
         1, json.dumps({"type": "error", "sessionID": "x", "error": {"message": "no provider"}}), ""
     )
     assert not bad.ok and bad.summary == "no provider"
+
+
+def test_harness_detected_from_the_process_tree():
+    from agentygg import detect
+
+    table = {
+        100: (1, "/Users/x/.local/share/claude/versions/2.1.186"),
+        200: (100, "/bin/zsh -c source /Users/x/.claude/shell-snapshots/s.sh && ygg connect"),
+        300: (200, "/usr/bin/python3 /Users/x/.local/bin/ygg connect"),
+        400: (1, "node /usr/lib/node_modules/opencode-ai/bin/opencode run --format json"),
+        410: (400, "bash -c ygg connect"),
+        500: (1, "/home/u/.hermes/venv/bin/python /home/u/.local/bin/hermes chat"),
+        510: (500, "sh -c ygg connect"),
+        600: (1, "codex exec --json"),
+        700: (1, "/bin/zsh -l"),
+        710: (700, "ygg connect"),
+        800: (1, "vim /home/u/my-claude-notes/todo.md"),
+        900: (1, "/bin/zsh -c cat > t.py <<EOF opencode run --format json EOF && ygg connect"),
+        1000: (
+            1,
+            "/Users/x/.vscode/extensions/anthropic.claude-code-2.1.3/resources/native-binary/claude --output-format stream-json",
+        ),
+        1100: (1, "C:\\Users\\u\\AppData\\Roaming\\npm\\codex.cmd exec"),
+        1200: (
+            1,
+            "node C:\\Users\\u\\AppData\\Roaming\\npm\\node_modules\\openclaw\\openclaw.mjs agent exec",
+        ),
+    }
+    assert detect.from_ancestors(table, start=900) is None  # a harness NAME in arguments is not it
+    assert detect.from_ancestors(table, start=1000) == "claude"
+    assert detect.from_ancestors(table, start=1100) == "codex"
+    assert detect.from_ancestors(table, start=1200) == "openclaw"
+    assert detect.from_ancestors(table, start=300) == "claude"
+    assert detect.from_ancestors(table, start=410) == "opencode"
+    assert detect.from_ancestors(table, start=510) == "hermes"
+    assert detect.from_ancestors(table, start=600) == "codex"
+    assert detect.from_ancestors(table, start=710) is None  # a plain terminal: no harness above
+    assert detect.from_ancestors(table, start=800) is None  # a folder name is not a harness
+    assert detect.from_environment({"CLAUDECODE": "1"}) == "claude"
+    assert detect.from_environment({}) is None

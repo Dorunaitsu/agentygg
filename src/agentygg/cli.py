@@ -1,5 +1,8 @@
 """`ygg`: connect an agent to Agent'Ygg.
 
+ygg connect              everything at once, in the agent's folder: the key from the
+                         clipboard, the harness it runs in (detected), MCP + skill, relay
+
 ygg agent add <key>      store an agent key on this machine (once, from the console)
 ygg setup claude         wire this directory's harness to the agent (MCP + skill); also
                          codex, hermes, openclaw, opencode, mcp (any MCP harness)
@@ -51,7 +54,7 @@ async def _with_gw(identity: store.Identity, fn):
 # -- agent ------------------------------------------------------------------ #
 
 
-def _clipboard() -> str:
+def _clipboard_raw() -> str | None:
     import shutil
     import subprocess
 
@@ -66,8 +69,14 @@ def _clipboard() -> str:
             r = subprocess.run(cmd, check=False, capture_output=True, text=True)
             if r.returncode == 0:
                 return r.stdout.strip()
-    _fail("could not read the clipboard here: pass the key with `ygg agent add -` on stdin")
-    return ""
+    return None
+
+
+def _clipboard() -> str:
+    clip = _clipboard_raw()
+    if clip is None:
+        _fail("could not read the clipboard here: pass the key with `ygg agent add -` on stdin")
+    return clip or ""
 
 
 def cmd_agent_add(args) -> None:
@@ -175,6 +184,109 @@ def cmd_agent_run(args) -> None:
             print(f"ygg: {e.detail}; the relay stops (remove it with `ygg relay remove`).")
             raise SystemExit(0) from e
         _fail(e.detail)
+
+
+# -- connect: everything in one command --------------------------------------- #
+
+
+def _obtain_key(args) -> str:
+    """The agent key, from wherever it is: --key, the clipboard (what the console's Copy key
+    puts there), $YGG_AGENT_KEY, a hidden prompt, or stdin. Never echoed."""
+    import getpass
+
+    if args.key and args.key != "-":
+        return args.key.strip()
+    if args.key != "-":
+        clip = _clipboard_raw() or ""
+        if clip.startswith(store.KEY_PREFIX):
+            print("Using the agent key from the clipboard (not shown).")
+            return clip
+        env_key = os.environ.get("YGG_AGENT_KEY", "").strip()
+        if env_key.startswith(store.KEY_PREFIX):
+            return env_key
+        if sys.stdin.isatty():
+            return getpass.getpass("Agent key (from the console, Copy key; input hidden): ").strip()
+    if args.key == "-" or not sys.stdin.isatty():
+        return sys.stdin.readline().strip()
+    return ""
+
+
+def cmd_connect(args) -> None:
+    """One command: store the key, find the harness we run in, wire it, start the relay."""
+    import argparse as _ap
+
+    from agentygg import detect, harnesses
+
+    root = Path.cwd()
+    # 1. The agent: the one already bound to this folder, else the key the user copied.
+    found = store.pointer_for(root)
+    ident = None
+    if found and not args.key:
+        try:
+            ident = store.load(found[0])
+            print(f"This folder already belongs to @{ident.agent_id}.")
+        except LookupError:
+            ident = None
+    if ident is None:
+        key = _obtain_key(args)
+        try:
+            wsid, aid = store.decode_key(key)
+        except (ValueError, KeyError, json.JSONDecodeError):
+            _fail(
+                "no agent key found: in the console, create the agent and click Copy key, then "
+                "run `ygg connect` again (or pass it on stdin: `ygg connect --key -`)"
+            )
+        ident = store.Identity(aid, wsid, key, args.api.rstrip("/"))
+        me = asyncio.run(_with_gw(ident, lambda gw: gw.me()))
+        ident.display_name = me.get("display_name", "")
+        ident.workspace_name = me.get("workspace_name", "")
+        store.save(ident)
+        store.write_pointer(root, aid)
+        print(f'Agent @{aid} ("{ident.display_name}") in "{ident.workspace_name or wsid}".')
+
+    # 2. The harness: asked for, else detected.
+    kind = args.harness
+    if not kind:
+        kind, how = detect.detect()
+        if kind:
+            print(f"Harness: {kind} ({how}).")
+        elif sys.stdin.isatty():
+            choices = [k for k in harnesses.KINDS if k != "command"]
+            print(f"Which harness runs this agent? ({how})")
+            for i, k in enumerate(choices, 1):
+                print(f"  {i}. {k}")
+            pick = input("Number: ").strip()
+            if not pick.isdigit() or not 1 <= int(pick) <= len(choices):
+                _fail("no harness chosen")
+            kind = choices[int(pick) - 1]
+        else:
+            _fail(
+                f"could not tell which harness to use ({how}); run `ygg connect --harness "
+                "<claude|codex|hermes|openclaw|opencode>`, or for anything else "
+                '`ygg connect --harness command --cmd "<one turn of your agent>"`'
+            )
+
+    # 3. Wire it (MCP server + skill), 4. start the relay.
+    if kind != "command":
+        cmd_setup(
+            _ap.Namespace(setup_cmd=kind, agent=ident.agent_id, harness_path=args.harness_path)
+        )
+    else:
+        cmd_setup(_ap.Namespace(setup_cmd="mcp", agent=ident.agent_id, harness_path=None))
+    if args.no_relay:
+        print("Skipped the relay (--no-relay): start it later with `ygg relay install`.")
+        return
+    cmd_relay_install(
+        _ap.Namespace(
+            agent=ident.agent_id,
+            dir=str(root),
+            harness=kind,
+            harness_path=args.harness_path,
+            cmd=args.cmd,
+            harness_args=list(args.harness_args or []),
+        )
+    )
+    print(f"Done: @{ident.agent_id} answers pings in the background. Check with `ygg relay list`.")
 
 
 # -- relay services ----------------------------------------------------------- #
@@ -503,6 +615,21 @@ def build_parser() -> argparse.ArgumentParser:
     _harness_opts(a)
     a.add_argument("harness_args", nargs=argparse.REMAINDER)
     a.set_defaults(fn=cmd_agent_run)
+
+    a = sub.add_parser(
+        "connect",
+        help="everything in one command: key, harness, MCP + skill, background relay",
+        description="Run it in the project folder (it is what you, or your agent, run after "
+        "clicking Copy key in the console): reads the key from the clipboard, detects the harness "
+        "it runs in, wires the MCP server and the skill, and installs the background relay. "
+        "Options after `--` go to the harness.",
+    )
+    a.add_argument("--key", help="the agent key, or - to read it from stdin (default: clipboard)")
+    a.add_argument("--api", default=os.environ.get("YGG_API", store.DEFAULT_API))
+    _harness_opts(a)
+    a.add_argument("--no-relay", action="store_true", help="wire the harness, do not start a relay")
+    a.add_argument("harness_args", nargs=argparse.REMAINDER)
+    a.set_defaults(fn=cmd_connect)
 
     rl = sub.add_parser("relay", help="relays as background services (login, reboot, crash)")
     rsub = rl.add_subparsers(dest="relay_cmd", required=True)

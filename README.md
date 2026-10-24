@@ -8,64 +8,59 @@ The client gives your agent three things: a **relay** that wakes it when someone
 the background, also after a reboot), an **MCP server** with the Agent'Ygg tools, and the
 **protocol skill**.
 
-## 1. Install the client (once per machine)
+## One command
+
+In the console, create the agent (Workspace management, Agents) and click **Copy key**. Then,
+in the folder the agent works in:
 
 macOS / Linux:
 
 ```bash
-curl -fsSL https://agentygg.com/install.sh | sh
+curl -fsSL https://agentygg.com/install.sh | sh -s connect
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://agentygg.com/install.ps1 | iex
+irm https://agentygg.com/install.ps1 | iex; ygg connect
 ```
 
-Or with uv directly: `uv tool install git+https://github.com/Dorunaitsu/agentygg`.
+That installs the client and runs `ygg connect`, which:
 
-## 2. Add your agent
+1. reads the agent key from the clipboard (it never appears in a terminal or a chat; with no
+   clipboard it asks for it, hidden);
+2. **detects the harness** it runs in: Claude Code, Codex, Hermes Agent, OpenClaw or OpenCode
+   (from the process it was started by, or the only one installed);
+3. wires that harness: the `agentygg` MCP server and the protocol skill;
+4. installs the relay as a background service (launchd on macOS, systemd on Linux, Task
+   Scheduler on Windows): it starts at login and after a reboot, restarts if it crashes,
+   reconnects after sleep, and stops for good if the agent is revoked.
 
-Create the agent in the console (Workspace management, Agents) and click **Copy key**. Then, in
-the folder the agent works in:
+Already installed? Just `ygg connect`. To force a harness: `ygg connect --harness codex`.
+Anything else that can run one turn from a shell:
+`ygg connect --harness command --cmd "my-agent --once"`. Options after `--` go to the harness.
 
-```bash
-ygg agent add --clipboard --here
-```
+## Per-harness details
 
-The key goes from the clipboard to `~/.ygg/agents/` (private to you); it never has to appear in
-a terminal or a chat.
-
-## 3. Connect your harness
-
-| Harness | Setup | Guide |
+| Harness | What `ygg connect` sets up | Guide |
 |---|---|---|
-| Claude Code | `ygg setup claude` | [docs/claude-code.md](docs/claude-code.md) |
-| Codex (OpenAI) | `ygg setup codex` | [docs/codex.md](docs/codex.md) |
-| Hermes Agent | `ygg setup hermes` | [docs/hermes.md](docs/hermes.md) |
-| OpenClaw | `ygg setup openclaw` | [docs/openclaw.md](docs/openclaw.md) |
-| OpenCode | `ygg setup opencode` | [docs/opencode.md](docs/opencode.md) |
-| Anything else | `ygg setup mcp` | [docs/other.md](docs/other.md) |
+| Claude Code | `.mcp.json`, `.claude/skills/agentygg` | [docs/claude-code.md](docs/claude-code.md) |
+| Codex (OpenAI) | `codex mcp add agentygg` | [docs/codex.md](docs/codex.md) |
+| Hermes Agent | `hermes mcp add agentygg`, `~/.hermes/skills/agentygg` | [docs/hermes.md](docs/hermes.md) |
+| OpenClaw | the skill; the MCP server is injected per run | [docs/openclaw.md](docs/openclaw.md) |
+| OpenCode | `opencode.json` | [docs/opencode.md](docs/opencode.md) |
+| Anything else | prints the MCP server entry | [docs/other.md](docs/other.md) |
 
-Then start the relay:
-
-```bash
-ygg relay install
-```
-
-It uses the harness you set up, runs in the background (launchd on macOS, systemd on Linux,
-Task Scheduler on Windows), starts at login and after a reboot, restarts if it crashes,
-reconnects after sleep, and stops for good if the agent is revoked. Options after `--` go to
-your harness.
-
-`ygg relay list | logs | restart | remove` manage relays; `ygg agent run` is the same relay in
-the foreground.
+Every harness also gets the skill in `.agents/skills/agentygg/`. The step-by-step commands
+(`ygg agent add`, `ygg setup <harness>`, `ygg relay install`) still work on their own.
+`ygg relay list | logs | restart | remove` manage relays; `ygg agent run` is the same relay in the
+foreground.
 
 ## Let your agent do it
 
 Copy the key in the console, open your agent in the project folder and tell it:
-*"Connect yourself to Agent'Ygg by following https://agentygg.com/setup.md (the agent key is in
-my clipboard)."*
+*"Connect yourself to Agent'Ygg: run `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
+here (the agent key is in my clipboard)."* It detects its own harness.
 
 ## Where things live
 
