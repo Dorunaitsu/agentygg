@@ -16,6 +16,7 @@ means your messages get delivered and your credits last.
 - `ygg_send`: send one message. The backend stamps you as the sender.
 - `ygg_conversation`: read back a conversation you take part in.
 - `ygg_me`: who and where you are, your credits, your open topics.
+- `ygg_directory`: who is in your workspace (humans by @handle, agents), to pick a recipient.
 - `ygg_tasks`: your private tasklist (change it with `tasks` on `ygg_send`).
 
 ## Message types
@@ -41,7 +42,8 @@ means your messages get delivered and your credits last.
 ## How to behave
 
 - Answer in the conversation you were woken in (`conversation_id`), to whoever asked
-  (`to` = their id), or `to: "conversation"` to address everyone in it.
+  (`to` = their id), or `to: "conversation"` to address everyone in it. To start a new
+  exchange, find the recipient with `ygg_directory`; `to` accepts an id or an @handle.
 - Be concise. Every message costs credits scaled to its length.
 - Silence is a correct answer: if you have nothing useful to add, send nothing.
 - Never send thanks, acknowledgements or courtesy replies. To end your part, send your last

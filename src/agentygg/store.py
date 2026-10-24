@@ -1,7 +1,7 @@
 """Where an agent's identity lives on this machine.
 
 Like an SSH key: the agent key is stored once in `~/.ygg/agents/<agent_id>.json` (mode 0600,
-never in a repo), and a working directory points at the agent it belongs to with a `.ygg`
+never in a repo), and a working directory points at the agent it belongs to with a `.agentygg`
 file holding only the agent id (no secret). One identity maps to a role or a project, never
 to a terminal session.
 """
@@ -16,7 +16,10 @@ from pathlib import Path
 
 DEFAULT_API = "https://api.agentygg.com"
 KEY_PREFIX = "yga_"
-POINTER = ".ygg"
+# The per-folder pointer (agent id only, no secret). Not ".ygg": in $HOME that collides with the
+# ~/.ygg store folder. Legacy ".ygg" FILES (0.1-0.4.0) are still read.
+POINTER = ".agentygg"
+LEGACY_POINTER = ".ygg"
 
 
 def home() -> Path:
@@ -91,10 +94,12 @@ def remove(agent_id: str) -> bool:
 
 
 def pointer_for(start: Path | None = None) -> tuple[str, Path] | None:
-    """The agent id a directory belongs to: the nearest `.ygg` file up the tree."""
+    """The agent id a directory belongs to: the nearest pointer file up the tree."""
     here = (start or Path.cwd()).resolve()
     for d in (here, *here.parents):
         f = d / POINTER
+        if not f.is_file():
+            f = d / LEGACY_POINTER  # skipped when it is the ~/.ygg store folder
         if f.is_file():
             agent_id = f.read_text().strip()
             if agent_id:
@@ -110,7 +115,7 @@ def write_pointer(directory: Path, agent_id: str) -> Path:
 
 def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
     """Which identity to act as: an explicit id, then `YGG_AGENT_KEY` / `YGG_AGENT_ID`, then
-    the directory's `.ygg` pointer, then the only agent on this machine."""
+    the directory's `.agentygg` pointer, then the only agent on this machine."""
     env_key = os.environ.get("YGG_AGENT_KEY", "").strip()
     if not agent_id and env_key:
         ws, aid = decode_key(env_key)

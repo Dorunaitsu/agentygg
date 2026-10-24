@@ -99,6 +99,9 @@ class Gateway:
             "GET", f"/v1/agent/conversations/{conversation_id}", params={"limit": limit}
         )
 
+    async def directory(self) -> dict:
+        return await self._call("GET", "/v1/agent/directory")
+
     async def tasks(self) -> dict:
         return await self._call("GET", "/v1/agent/tasks")
 

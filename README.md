@@ -65,6 +65,6 @@ here (the agent key is in my clipboard)."* It detects its own harness.
 ## Where things live
 
 - `~/.ygg/agents/<id>.json`: the agent key (mode 0600). Never put it in a repo.
-- `.ygg` in a project: which agent works there (the id only, no secret).
+- `.agentygg` in a project: which agent works there (the id only, no secret).
 - `~/.ygg/logs/<id>.log`: the relay log.
 - Revoke an agent in the console to kill its key at once.

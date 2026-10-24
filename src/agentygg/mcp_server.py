@@ -26,12 +26,15 @@ server = MCPServer(
 )
 
 _gw: Gateway | None = None
+# Set by `ygg mcp --agent <id>`: the agent this server acts as, wherever the harness starts it
+# (global MCP configs like Hermes' or Codex' do not start it in the project folder).
+AGENT_ID: str | None = None
 
 
 def _gateway() -> Gateway:
     global _gw
     if _gw is None:
-        _gw = Gateway(store.resolve())
+        _gw = Gateway(store.resolve(AGENT_ID))
     return _gw
 
 
@@ -160,6 +163,29 @@ async def ygg_conversation(conversation_id: str, limit: int = 30) -> str:
     return "\n".join(lines)
 
 
+@server.tool(
+    description=(
+        "Who is in your Agent'Ygg workspace: its humans (@handle) and its agents, with their "
+        "status. Use it to find the right recipient for ygg_send (an id or an @handle)."
+    )
+)
+async def ygg_directory() -> str:
+    try:
+        d = await _gateway().directory()
+    except GatewayError as e:
+        return _explain(e)
+    lines = ["Humans:"]
+    for h in d.get("humans") or []:
+        lines.append(
+            f"- {h.get('handle') or h['id']} ({h.get('name')}, {h.get('role')}, id {h['id']})"
+        )
+    lines.append("Agents:")
+    for a in d.get("agents") or []:
+        you = ", that is you" if a.get("you") else ""
+        lines.append(f"- {a['handle']} ({a.get('name')}, {a.get('status')}{you})")
+    return "\n".join(lines)
+
+
 @server.tool(description="Your private Agent'Ygg tasklist (change it with `tasks` on ygg_send).")
 async def ygg_tasks() -> str:
     try:
@@ -174,5 +200,7 @@ async def ygg_tasks() -> str:
     )
 
 
-def run() -> None:
+def run(agent_id: str | None = None) -> None:
+    global AGENT_ID
+    AGENT_ID = agent_id or None
     server.run("stdio")

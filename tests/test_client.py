@@ -92,3 +92,52 @@ def test_relay_service_definitions(tmp_path, monkeypatch):
 def test_relay_prompt_leaves_out_the_setup_tutorial():
     text = skill_text()
     assert "ygg_send" in text and "Connecting yourself" not in text
+
+
+def test_pointer_does_not_collide_with_the_store_in_home(tmp_path, monkeypatch):
+    """In $HOME, ~/.ygg is the store FOLDER: binding the home folder must still work, and the
+    folder is never mistaken for a pointer."""
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / ".ygg"))
+    (tmp_path / ".ygg" / "agents").mkdir(parents=True)
+    store.save(store.Identity("solo", "lab", _key("lab", "solo")))
+    assert store.pointer_for(tmp_path) is None  # the store folder is not a pointer
+    store.write_pointer(tmp_path, "solo")  # used to raise IsADirectoryError
+    assert store.pointer_for(tmp_path) == ("solo", tmp_path.resolve())
+    legacy = tmp_path / "old"
+    legacy.mkdir()
+    (legacy / ".ygg").write_text("solo\n")  # a 0.4.0 pointer file is still honored
+    assert store.pointer_for(legacy)[0] == "solo"
+
+
+def test_setup_hermes_answers_the_prompt_and_verifies(tmp_path, monkeypatch):
+    """Hermes' `mcp add` asks "Enable all tools? [Y/n/select]" and saves nothing without an
+    answer: setup must answer it, pin the agent, and check `hermes mcp list`."""
+    import sys
+
+    from agentygg import cli
+
+    if os.name == "nt":
+        pytest.skip("POSIX shell fake")
+    reg = tmp_path / "hermes-registry"
+    fake = tmp_path / "hermes"
+    fake.write_text(
+        "#!/bin/sh\n"
+        f'REG="{reg}"\n'
+        'if [ "$1 $2" = "mcp add" ]; then read ans; [ "$ans" = "Y" ] && echo "$@" >> "$REG"; exit 0; fi\n'
+        'if [ "$1 $2" = "mcp list" ]; then cat "$REG" 2>/dev/null; exit 0; fi\n'
+        "exit 0\n"
+    )
+    fake.chmod(0o755)
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hh"))
+    monkeypatch.delenv("YGG_AGENT_ID", raising=False)
+    store.save(store.Identity("betty", "lab", _key("lab", "betty")))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    monkeypatch.chdir(proj)
+    cli.main(["setup", "hermes", "--agent", "betty", "--harness-path", str(fake)])
+    saved = reg.read_text()
+    assert "agentygg" in saved and "--agent betty" in saved
+    assert (tmp_path / "hh" / "skills" / "agentygg" / "SKILL.md").exists()
+    assert store.load("betty").harness == "hermes"
+    assert sys.executable  # (the MCP command is the installed ygg launcher)

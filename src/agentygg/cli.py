@@ -402,7 +402,7 @@ def _mcp_json() -> str:
 
 
 def cmd_setup(args) -> None:
-    """Wire this folder's agent into a harness: the `.ygg` pointer, the protocol skill where the
+    """Wire this folder's agent into a harness: the `.agentygg` pointer, the protocol skill where the
     harness reads skills, and the `agentygg` MCP server in the harness' own config. The MCP
     server finds the agent from the folder it runs in, so one entry serves every agent."""
     import subprocess
@@ -417,13 +417,13 @@ def cmd_setup(args) -> None:
         ident.harness = kind
         ident.harness_path = args.harness_path or ""
         store.save(ident)
-    done = [".ygg                          which agent works here (no secret inside)"]
+    done = [".agentygg                     which agent works here (no secret inside)"]
     # The cross-harness skills location (agentskills.io): OpenClaw, Codex and others read it.
     _write_skill(root / ".agents" / "skills" / "agentygg")
     done.append(".agents/skills/agentygg/       the Agent'Ygg protocol skill")
 
-    def run(cmd: list[str]) -> bool:
-        r = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    def run(cmd: list[str], answer: str | None = None) -> bool:
+        r = subprocess.run(cmd, check=False, capture_output=True, text=True, input=answer or "")
         return r.returncode == 0
 
     if kind == "claude":
@@ -446,7 +446,9 @@ def cmd_setup(args) -> None:
         except FileNotFoundError as e:
             _fail(str(e))
         run([exe, "mcp", "remove", "agentygg"])
-        if not run([exe, "mcp", "add", "agentygg", "--", _ygg_cmd(), "mcp"]):
+        if not run(
+            [exe, "mcp", "add", "agentygg", "--", _ygg_cmd(), "mcp", "--agent", ident.agent_id]
+        ):
             _fail("`codex mcp add` failed; add the agentygg server by hand: " + _mcp_json())
         done.append("~/.codex/config.toml          the agentygg MCP server (codex mcp add)")
     elif kind == "hermes":
@@ -454,16 +456,35 @@ def cmd_setup(args) -> None:
             exe = harnesses.Hermes(args.harness_path).exe()
         except FileNotFoundError as e:
             _fail(str(e))
-        run([exe, "mcp", "remove", "agentygg"])
-        if not run([exe, "mcp", "add", "agentygg", "--command", _ygg_cmd(), "--args", "mcp"]):
+        run([exe, "mcp", "remove", "agentygg"], "y\n")
+        # `hermes mcp add` asks "Enable all N tools? [Y/n/select]": answer it, then CHECK that
+        # the server was saved instead of trusting the exit code.
+        run(
+            [
+                exe,
+                "mcp",
+                "add",
+                "agentygg",
+                "--command",
+                _ygg_cmd(),
+                "--args",
+                "mcp",
+                "--agent",
+                ident.agent_id,
+            ],
+            "Y\n",
+        )
+        listed = subprocess.run([exe, "mcp", "list"], check=False, capture_output=True, text=True)
+        if "agentygg" not in (listed.stdout + listed.stderr):
             _fail(
-                "`hermes mcp add` failed; add it under mcp_servers in ~/.hermes/config.yaml: "
-                + _mcp_json()
+                "Hermes did not save the agentygg MCP server; add it by hand under mcp_servers in "
+                f"~/.hermes/config.yaml with command {_ygg_cmd()} and args [mcp, --agent, "
+                f"{ident.agent_id}]"
             )
         hermes_home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
         _write_skill(hermes_home / "skills" / "agentygg")
         done += [
-            "hermes config                 the agentygg MCP server (hermes mcp add)",
+            "hermes config                 the agentygg MCP server (checked with hermes mcp list)",
             f"{hermes_home}/skills/agentygg/  the skill, where Hermes reads it",
         ]
     elif kind == "opencode":
@@ -538,10 +559,24 @@ def cmd_send(args) -> None:
     print(json.dumps(asyncio.run(_with_gw(_identity(args), go)), indent=2))
 
 
-def cmd_mcp(_args) -> None:
+def cmd_mcp(args) -> None:
     from agentygg.mcp_server import run
 
-    run()
+    run(getattr(args, "agent", None))
+
+
+def cmd_directory(args) -> None:
+    d = asyncio.run(_with_gw(_identity(args), lambda gw: gw.directory()))
+    if args.json:
+        print(json.dumps(d, indent=2))
+        return
+    print("Humans:")
+    for h in d.get("humans") or []:
+        print(f"  {h.get('handle') or h['id']:<24} {h.get('name')} ({h.get('role')})  id {h['id']}")
+    print("Agents:")
+    for a in d.get("agents") or []:
+        you = "  <- you" if a.get("you") else ""
+        print(f"  {a['handle']:<24} {a.get('name')} ({a.get('status')}){you}")
 
 
 def cmd_skill(_args) -> None:
@@ -663,7 +698,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("setup", help="wire a harness in this directory to the agent")
     ssub = s.add_subparsers(dest="setup_cmd", required=True)
     for name, hlp in (
-        ("claude", "Claude Code: .mcp.json + the skill + the .ygg pointer"),
+        ("claude", "Claude Code: .mcp.json + the skill + the .agentygg pointer"),
         ("codex", "OpenAI Codex CLI: codex mcp add + the skill"),
         ("hermes", "Hermes Agent: hermes mcp add + the skill"),
         ("openclaw", "OpenClaw: the skill (the relay injects the MCP server per run)"),
@@ -697,9 +732,14 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--tasks", help="JSON list of tasklist ops")
     a.set_defaults(fn=cmd_send)
 
-    sub.add_parser("mcp", help="run the MCP server (your harness starts it)").set_defaults(
-        fn=cmd_mcp
-    )
+    a = sub.add_parser("directory", help="who is in the agent's workspace (humans and agents)")
+    a.add_argument("--agent")
+    a.add_argument("--json", action="store_true")
+    a.set_defaults(fn=cmd_directory)
+
+    mcp_p = sub.add_parser("mcp", help="run the MCP server (your harness starts it)")
+    mcp_p.add_argument("--agent", help="act as this agent wherever the harness starts the server")
+    mcp_p.set_defaults(fn=cmd_mcp)
     sub.add_parser("skill", help="print the Agent'Ygg protocol skill").set_defaults(fn=cmd_skill)
     return p
 
