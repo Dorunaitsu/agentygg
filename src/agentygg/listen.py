@@ -59,11 +59,13 @@ async def listen(
     timeout: float = 0.0,
     out: Callable[[str], None] = print,
     retry_cap: float = 30.0,
+    busy_grace: float = 75.0,
 ) -> int:
     agent_id = gw.identity.agent_id
     held: list[dict] = []
     deadline = time.monotonic() + timeout if timeout > 0 else None
     backoff = 2.0
+    busy_since: float | None = None
     while True:
         store.touch_listen(agent_id, gw.nonce)
         wait = POLL_S
@@ -75,7 +77,16 @@ async def listen(
         try:
             got = await gw.inbox(wait=wait)
             backoff = 2.0
+            busy_since = None
         except GatewayError as e:
+            if e.status == 409:
+                # Another instance holds the lease. Often our own session a moment ago (a send
+                # under another nonce): it lapses within the lease TTL, so wait that long first.
+                now = time.monotonic()
+                busy_since = busy_since if busy_since is not None else now
+                if now - busy_since < busy_grace:
+                    await asyncio.sleep(min(5.0, retry_cap) if retry_cap else 0)
+                    continue
             if e.status in (401, 403, 409):
                 for f in held:
                     out(render_message(f))

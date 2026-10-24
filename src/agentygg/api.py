@@ -56,12 +56,12 @@ def _relay_nonce(agent_id: str) -> str | None:
 
 
 def _listen_nonce(agent_id: str) -> str | None:
-    """The instance nonce of a live session listening for this agent (`ygg listen`), so the
-    `ygg send` / MCP calls of that same session act under its lease."""
+    """The instance nonce of the live session that listens for this agent (`ygg listen`), so
+    the `ygg send` / MCP calls of that session act under its lease. Taken at any age: a session
+    may answer minutes after its listener ended, and a fresh nonce then would hold the lease
+    against the listener it starts next."""
     from agentygg import store
 
-    if not store.listener_active(agent_id):
-        return None
     nonce = (store.read_listen(agent_id) or {}).get("nonce")
     return nonce if isinstance(nonce, str) else None
 

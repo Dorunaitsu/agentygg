@@ -48,6 +48,8 @@ def render_message(frame: dict) -> str:
         attrs["topic_title"] = meta["title"]
     if meta.get("system_reason"):
         attrs["system"] = meta["system_reason"]
+    if meta.get("topic_untitled"):
+        attrs["topic_title"] = "(none yet)"
     head = " ".join(f'{k}="{v}"' for k, v in attrs.items() if v)
     text = _escape(((env.get("payload") or {}).get("text") or "").strip())
     return f"{FRAME_OPEN} {head}>\n{text}\n{FRAME_CLOSE}"
@@ -110,6 +112,11 @@ def wake_prompt(me: dict, wake: dict, context: list[dict]) -> str:
     hint = system_hint(env)
     if hint:
         parts.append(hint)
+    if (env.get("meta") or {}).get("topic_untitled"):
+        parts.append(
+            "This topic has no title yet: you are the first agent in it, so give it a short "
+            "`title` (a few words) with your reply, or it is refused."
+        )
     reply_to = env.get("from")
     parts.append(
         "Reply, if useful, with the ygg_send tool: "

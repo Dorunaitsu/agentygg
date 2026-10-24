@@ -79,7 +79,7 @@ def test_gateway_restart_is_retried_and_refusal_stops(home):
     assert "hello" in out[0]
     gw = FakeGw([GatewayError(409, "identity_busy")])
     out = []
-    assert asyncio.run(lst.listen(gw, out=out.append)) == lst.STOPPED
+    assert asyncio.run(lst.listen(gw, out=out.append, busy_grace=0)) == lst.STOPPED
     assert "identity_busy" in out[-1]
 
 
@@ -156,3 +156,40 @@ def test_a_refused_send_never_reads_as_delivered():
     ctx = describe_send({"verdict": "CONTEXT_ONLY", "reason": "context_inform"})
     assert ctx.startswith("delivered as context")
     assert describe_send({"verdict": "WAKE", "reason": "ok_wake"}).startswith("delivered, and")
+
+
+def test_a_lease_held_a_moment_ago_by_our_own_send_is_waited_out(home):
+    ping = _frame("human.1", "human", "PING")
+    gw = FakeGw([GatewayError(409, "identity_busy"), {"wakes": [ping], "mailbox": []}])
+    out = []
+    assert asyncio.run(lst.listen(gw, out=out.append, retry_cap=0)) == lst.GOT_MESSAGE
+    assert "PING" in out[0]
+
+
+def test_a_send_long_after_the_listener_keeps_its_instance(home):
+    from agentygg.api import _listen_nonce
+
+    store.touch_listen("bot", "abc123")
+    data = store.read_listen("bot")
+    data["ts"] -= 3600  # the session answered an hour after its listener ended
+    store.listen_path("bot").write_text(__import__("json").dumps(data))
+    assert _listen_nonce("bot") == "abc123"
+
+
+def test_an_untitled_topic_asks_the_first_agent_for_a_title():
+    from agentygg.render import wake_prompt
+
+    wake = {
+        "from": {"id": "human.1", "kind": "human", "label": "@ray"},
+        "envelope": {
+            "id": "m1",
+            "type": "request",
+            "from": "human.1",
+            "conversation_id": "c1",
+            "topic_id": "t1",
+            "payload": {"text": "ping"},
+            "meta": {"topic_untitled": True},
+        },
+    }
+    prompt = wake_prompt({"agent_id": "bot"}, wake, [])
+    assert 'topic_title="(none yet)"' in prompt and "give it a short `title`" in prompt
