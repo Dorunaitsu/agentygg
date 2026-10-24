@@ -2,6 +2,7 @@
 (formats from each project's documented CLI output). No harness or network needed."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -25,9 +26,9 @@ def test_claude_command_and_result():
         and t.cmd[-2:] == ["--model", "opus"]
     )
     assert (
-        json.load(open(t.cmd[t.cmd.index("--mcp-config") + 1]))["mcpServers"]["agentygg"]["env"][
-            "YGG_INSTANCE"
-        ]
+        json.loads(Path(t.cmd[t.cmd.index("--mcp-config") + 1]).read_text())["mcpServers"][
+            "agentygg"
+        ]["env"]["YGG_INSTANCE"]
         == "n1"
     )
     r = h.parse(0, json.dumps({"session_id": "s2", "result": "done", "is_error": False}), "")
@@ -115,7 +116,7 @@ def test_service_argv_carries_the_harness(tmp_path, monkeypatch):
     argv = service.relay_argv("bot", tmp_path, ["-m", "x"], harness="codex")
     assert (
         argv[argv.index("--harness") + 1] == "codex"
-        and argv[argv.index("--harness-path") + 1] == "/bin/codex"
+        and Path(argv[argv.index("--harness-path") + 1]).name == "codex"
     )
     argv = service.relay_argv("bot", tmp_path, [], harness="command", cmd="run-it")
     assert "--harness-path" not in argv and argv[argv.index("--cmd") + 1] == "run-it"

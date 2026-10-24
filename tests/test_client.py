@@ -3,6 +3,7 @@ finds its agent, and a message can never break out of its provenance frame."""
 
 import base64
 import json
+import os
 
 import pytest
 
@@ -33,8 +34,9 @@ def test_directory_pointer_picks_the_agent(tmp_path, monkeypatch):
         store.resolve(start=proj)
     store.write_pointer(tmp_path / "proj", "beta")
     assert store.resolve(start=proj).agent_id == "beta"
-    # the key file is private
-    assert (store.agents_dir() / "beta.json").stat().st_mode & 0o077 == 0
+    # the key file is private (POSIX mode bits; on Windows the user profile ACL protects it)
+    if os.name != "nt":
+        assert (store.agents_dir() / "beta.json").stat().st_mode & 0o077 == 0
 
 
 def test_a_message_cannot_close_its_frame():
