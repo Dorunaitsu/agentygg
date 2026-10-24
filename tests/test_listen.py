@@ -193,3 +193,29 @@ def test_an_untitled_topic_asks_the_first_agent_for_a_title():
     }
     prompt = wake_prompt({"agent_id": "bot"}, wake, [])
     assert 'topic_title="(none yet)"' in prompt and "give it a short `title`" in prompt
+
+
+def test_a_relay_starting_during_a_gateway_restart_waits_for_it(home, monkeypatch):
+    relay = Relay(store.Identity("bot", "lab", "yga_x"), home, command=["true"])
+    calls = []
+
+    async def me():
+        calls.append(1)
+        if len(calls) < 3:
+            raise GatewayError(502, "Bad Gateway")
+        return {"agent_id": "bot"}
+
+    async def no_sleep(_):
+        return None
+
+    relay.gw.me = me
+    monkeypatch.setattr("agentygg.relay.asyncio.sleep", no_sleep)
+    assert asyncio.run(relay._first_contact()) == {"agent_id": "bot"} and len(calls) == 3
+
+    async def refused():
+        raise GatewayError(401, "unauthorized")
+
+    relay.gw.me = refused
+    with pytest.raises(GatewayError):
+        asyncio.run(relay._first_contact())
+    asyncio.run(relay.gw.close())

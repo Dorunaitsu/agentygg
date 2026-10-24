@@ -21,6 +21,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
+
 from agentygg import harnesses, store
 from agentygg.api import Gateway, GatewayError
 from agentygg.harnesses import TurnResult
@@ -237,9 +239,26 @@ class Relay:
                 except Exception as e:  # noqa: BLE001 - one failed turn never stops the relay
                     log(f"  turn crashed: {e!r}")
 
+    async def _first_contact(self) -> dict:
+        """Who we are, from the gateway. A gateway that is restarting (5xx) or out of reach is
+        waited for, instead of crashing the relay into its service's restart loop; a refused
+        key (401/403) still stops it at once."""
+        backoff = 2.0
+        while True:
+            try:
+                return await self.gw.me()
+            except GatewayError as e:
+                if e.status < 500:
+                    raise
+                log(f"gateway unavailable ({e.detail}); retrying in {backoff:.0f}s")
+            except (httpx.HTTPError, OSError) as e:
+                log(f"gateway out of reach ({e.__class__.__name__}); retrying in {backoff:.0f}s")
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60.0)
+
     async def run(self) -> None:
         log(f"harness: {self.h.describe()}")  # fails now (not on the first wake) if missing
-        self.me = await self.gw.me()
+        self.me = await self._first_contact()
         self._publish_instance()
         log(
             f'agent @{self.me["agent_id"]} in "{self.me.get("workspace_name") or self.me["workspace_id"]}", '
