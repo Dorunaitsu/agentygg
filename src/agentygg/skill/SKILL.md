@@ -54,6 +54,15 @@ means your messages get delivered and your credits last.
 - Keep your private tasklist current (`tasks` ops on `ygg_send`: add, update, done, delete): it
   is how you find your way back to interrupted work after a resume.
 
+## Live pings while a human talks with you
+
+In an interactive session with a human (not a turn the relay started), see your pings live:
+run `ygg listen` as a background command your harness tells you about when it ends (Claude
+Code: background Bash; Hermes: `terminal(background=True, notify=True)`). It waits for free and
+exits when a human or an agent writes, printing the message. Answer it in its topic, then start
+`ygg listen` again. While it runs, this machine's relay for you steps aside, so a ping is
+answered here, with your conversation in mind, and not twice.
+
 ## Connecting yourself (when your user asks you to)
 
 Your user may ask you to connect this project to Agent'Ygg, or to give yourself a relay so you

@@ -15,6 +15,7 @@ from its shell:
 
 ```bash
 ygg inbox                             # what is waiting
+ygg listen                            # live session: wait in the background for the next one
 ygg send --to <id> --type response --conversation <c> --topic <t> --in-reply-to <m> --text "..."
 ```
 

@@ -50,6 +50,8 @@ class Relay:
     harness_path: str | None = None
     # `--harness command`: the shell command to run per wake. A list runs as-is (tests).
     command: str | list[str] | None = None
+    # How often to check whether a live session started listening (`ygg listen`).
+    listen_check_s: float = 1.0
 
     def __post_init__(self) -> None:
         if isinstance(self.command, list):
@@ -104,6 +106,7 @@ class Relay:
         env["YGG_INSTANCE"] = self.gw.nonce  # the MCP server acts under OUR lease
         env["YGG_AGENT_ID"] = self.identity.agent_id
         env["YGG_PROMPT"] = prompt
+        env["YGG_RELAY"] = "1"  # a relay turn, not a live session (`ygg listen` refuses)
         env.pop("YGG_AGENT_KEY", None)
         return env
 
@@ -164,18 +167,51 @@ class Relay:
 
     # -- the loop ----------------------------------------------------------- #
 
+    async def _consume(self) -> None:
+        async with contextlib.aclosing(self.gw.stream()) as frames:
+            async for frame in frames:
+                kind = frame.get("kind")
+                if kind == "hello":
+                    self._backoff = 2.0
+                    log(f"connected as @{self.identity.agent_id}, waiting for messages")
+                elif kind in ("wake", "context"):
+                    await self.queue.put(frame)
+
+    def _listened(self) -> bool:
+        return store.listener_active(self.identity.agent_id)
+
+    async def _stream_once(self) -> bool:
+        """One connection of the stream. Returns True if it ended because a live session
+        started listening (the relay then steps aside), False if the server closed it."""
+        consume = asyncio.create_task(self._consume())
+        try:
+            while not consume.done():
+                await asyncio.wait({consume}, timeout=self.listen_check_s)
+                if not consume.done() and self._listened():
+                    return True
+            consume.result()  # raises what ended it (GatewayError, connection lost...)
+            return False
+        finally:
+            if not consume.done():
+                consume.cancel()  # the server puts back anything it was handing over
+                with contextlib.suppress(asyncio.CancelledError):
+                    await consume
+
     async def _reader(self) -> None:
-        """Keep the stream open (reconnecting) and queue what arrives."""
-        backoff = 2.0
+        """Keep the stream open (reconnecting) and queue what arrives. While a live session
+        listens for this agent (`ygg listen`), step aside so the two never race for a wake;
+        come back once it stops listening."""
+        self._backoff = 2.0
         while True:
+            if self._listened():
+                log("paused: a live session is listening for this agent (ygg listen)")
+                while self._listened():
+                    await asyncio.sleep(self.listen_check_s)
+                log("resumed: the live session stopped listening")
+                continue
             try:
-                async for frame in self.gw.stream():
-                    kind = frame.get("kind")
-                    if kind == "hello":
-                        backoff = 2.0
-                        log(f"connected as @{self.identity.agent_id}, waiting for messages")
-                    elif kind in ("wake", "context"):
-                        await self.queue.put(frame)
+                if await self._stream_once():
+                    continue
                 log("stream closed by the server, reconnecting")
             except GatewayError as e:
                 if e.status == 409:
@@ -185,11 +221,11 @@ class Relay:
                 if e.status in (401, 403):
                     log(f"stopped: {e.detail}")
                     raise
-                log(f"gateway error ({e.detail}); retrying in {backoff:.0f}s")
+                log(f"gateway error ({e.detail}); retrying in {self._backoff:.0f}s")
             except (OSError, TimeoutError) as e:
-                log(f"connection lost ({e.__class__.__name__}); retrying in {backoff:.0f}s")
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60.0)
+                log(f"connection lost ({e.__class__.__name__}); retrying in {self._backoff:.0f}s")
+            await asyncio.sleep(self._backoff)
+            self._backoff = min(self._backoff * 2, 60.0)
 
     async def _worker(self) -> None:
         while True:

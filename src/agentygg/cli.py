@@ -11,6 +11,7 @@ ygg relay install        the same relay as a background service (login, reboot, 
 ygg relay list           the relays on this machine and whether they are running
 ygg agent status         who, where, credits, online or not
 ygg inbox / ygg send     the same actions from a shell, for any other harness
+ygg listen               in a live session: wait in the background for the next message
 ygg mcp                  the MCP server (started by your harness, not by hand)
 """
 
@@ -565,6 +566,32 @@ def cmd_mcp(args) -> None:
     run(getattr(args, "agent", None))
 
 
+def cmd_listen(args) -> None:
+    if os.environ.get("YGG_RELAY"):
+        _fail(
+            "ygg listen is for a session a human is having with the agent; this turn was "
+            "started by the relay, which already delivers the pings"
+        )
+    from agentygg.listen import listen, listen_nonce
+
+    ident = _identity(args)
+    print(f"ygg: listening for @{ident.agent_id}", file=sys.stderr, flush=True)
+
+    async def go() -> int:
+        gw = Gateway(ident, nonce=listen_nonce(ident.agent_id))
+        try:
+            return await listen(gw, include_system=args.all, timeout=args.timeout)
+        finally:
+            await gw.close()
+
+    try:
+        code = asyncio.run(go())
+    except KeyboardInterrupt:
+        store.clear_listen(ident.agent_id)  # stopped by hand: the relay may resume at once
+        code = 130
+    raise SystemExit(code)
+
+
 def cmd_directory(args) -> None:
     d = asyncio.run(_with_gw(_identity(args), lambda gw: gw.directory()))
     if args.json:
@@ -731,6 +758,22 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--waiting-for", dest="waiting_for")
     a.add_argument("--tasks", help="JSON list of tasklist ops")
     a.set_defaults(fn=cmd_send)
+
+    a = sub.add_parser(
+        "listen",
+        help="in a live session: wait (in the background) until a human or an agent writes",
+        description=(
+            "Run it as a background command in a session a human is having with the agent: it "
+            "exits as soon as a message arrives and prints it, so the session sees its pings "
+            "live. Start it again after answering. Meanwhile the relay steps aside."
+        ),
+    )
+    a.add_argument("--agent")
+    a.add_argument("--all", action="store_true", help="also stop on system notices")
+    a.add_argument(
+        "--timeout", type=float, default=0.0, help="give up after this many seconds (0: never)"
+    )
+    a.set_defaults(fn=cmd_listen)
 
     a = sub.add_parser("directory", help="who is in the agent's workspace (humans and agents)")
     a.add_argument("--agent")

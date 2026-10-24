@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -91,6 +92,50 @@ def remove(agent_id: str) -> bool:
         path.unlink()
         return True
     return False
+
+
+# -- live listening (`ygg listen`) -------------------------------------------- #
+
+# A live session that ran `ygg listen` less than this long ago still counts as listening: the
+# listener refreshes its mark at every long poll (25 s), and the grace covers the moment between
+# one listener exiting on a message and the session starting the next one.
+LISTEN_TTL_S = 90.0
+
+
+def listen_path(agent_id: str) -> Path:
+    return state_dir() / f"{agent_id}.listen"
+
+
+def read_listen(agent_id: str) -> dict | None:
+    try:
+        data = json.loads(listen_path(agent_id).read_text())
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def touch_listen(agent_id: str, nonce: str) -> None:
+    """Mark this agent as listened to by a live session (the relay steps aside meanwhile)."""
+    p = listen_path(agent_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"nonce": nonce, "pid": os.getpid(), "ts": time.time()}))
+    tmp.replace(p)
+
+
+def listener_active(agent_id: str, now: float | None = None) -> bool:
+    data = read_listen(agent_id)
+    ts = data.get("ts") if data else None
+    if not isinstance(ts, (int, float)):
+        return False
+    return ((time.time() if now is None else now) - ts) < LISTEN_TTL_S
+
+
+def clear_listen(agent_id: str) -> None:
+    try:
+        listen_path(agent_id).unlink()
+    except OSError:
+        pass
 
 
 def pointer_for(start: Path | None = None) -> tuple[str, Path] | None:

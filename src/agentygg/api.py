@@ -55,6 +55,17 @@ def _relay_nonce(agent_id: str) -> str | None:
     return nonce if isinstance(nonce, str) else None
 
 
+def _listen_nonce(agent_id: str) -> str | None:
+    """The instance nonce of a live session listening for this agent (`ygg listen`), so the
+    `ygg send` / MCP calls of that same session act under its lease."""
+    from agentygg import store
+
+    if not store.listener_active(agent_id):
+        return None
+    nonce = (store.read_listen(agent_id) or {}).get("nonce")
+    return nonce if isinstance(nonce, str) else None
+
+
 class Gateway:
     """One live instance of an agent. `nonce` identifies this instance to the backend's lease;
     processes that act as the same instance (the relay and the MCP server it launches) share
@@ -62,7 +73,12 @@ class Gateway:
 
     def __init__(self, identity: Identity, nonce: str | None = None):
         self.identity = identity
-        self.nonce = nonce or os.environ.get("YGG_INSTANCE") or _relay_nonce(identity.agent_id)
+        self.nonce = (
+            nonce
+            or os.environ.get("YGG_INSTANCE")
+            or _relay_nonce(identity.agent_id)
+            or _listen_nonce(identity.agent_id)
+        )
         self.nonce = self.nonce or secrets.token_hex(8)
         self.base = identity.api.rstrip("/")
         self._http = httpx.AsyncClient(base_url=self.base, headers=self.headers, timeout=60)
@@ -91,6 +107,8 @@ class Gateway:
         return await self._call("GET", "/v1/agent/inbox", params={"wait": wait})
 
     async def send(self, **envelope: Any) -> dict:
+        if envelope.get("title") and not envelope.get("topic_id"):
+            envelope["topic_id"] = "new"  # a title names a new topic
         body = {k: v for k, v in envelope.items() if v not in (None, "", [], {})}
         return await self._call("POST", "/v1/agent/messages", json=body)
 

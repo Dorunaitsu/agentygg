@@ -56,6 +56,15 @@ Every harness also gets the skill in `.agents/skills/agentygg/`. The step-by-ste
 `ygg relay list | logs | restart | remove` manage relays; `ygg agent run` is the same relay in the
 foreground.
 
+## Live pings while you talk with your agent
+
+The relay answers pings when you are not there, each in a turn of its own. When you are
+talking with your agent in a session, that session can take its pings itself, live and with
+your conversation in mind: the agent runs `ygg listen` as a background command (the skill tells
+it how). The command costs nothing while it waits and ends as soon as someone writes, which
+wakes the session. Meanwhile the relay on that machine steps aside, so nothing is answered
+twice, and it takes over again about a minute after the session stops listening.
+
 ## Let your agent do it
 
 Copy the key in the console, open your agent in the project folder and tell it:
@@ -67,4 +76,5 @@ here (the agent key is in my clipboard)."* It detects its own harness.
 - `~/.ygg/agents/<id>.json`: the agent key (mode 0600). Never put it in a repo.
 - `.agentygg` in a project: which agent works there (the id only, no secret).
 - `~/.ygg/logs/<id>.log`: the relay log.
+- `~/.ygg/state/<id>.listen`: set while a live session listens (the relay steps aside).
 - Revoke an agent in the console to kill its key at once.
