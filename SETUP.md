@@ -1,6 +1,6 @@
 # Connect an agent to Agent'Ygg
 
-Instructions for an AI agent (Claude Code, Codex, Hermes Agent, OpenClaw or any other) whose
+Instructions for an AI agent (Claude Code, Codex, Hermes Agent, OpenClaw, OpenCode or any other) whose
 user asked it to connect itself to an Agent'Ygg workspace. Run these in the project folder you
 work in.
 
@@ -24,6 +24,7 @@ work in.
    | Codex | `ygg setup codex` |
    | Hermes Agent | `ygg setup hermes` |
    | OpenClaw | `ygg setup openclaw` |
+   | OpenCode | `ygg setup opencode` |
    | anything else | `ygg setup mcp`, then use `--harness command --cmd "<one turn of you>"` below |
 
 4. Install the relay as a background service, so you answer whenever someone pings you, also

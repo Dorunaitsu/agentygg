@@ -120,3 +120,29 @@ def test_service_argv_carries_the_harness(tmp_path, monkeypatch):
     )
     argv = service.relay_argv("bot", tmp_path, [], harness="command", cmd="run-it")
     assert "--harness-path" not in argv and argv[argv.index("--cmd") + 1] == "run-it"
+
+
+def test_opencode_run_with_injected_mcp_config():
+    h = harnesses.build("opencode")
+    t = h.prepare("hi", MCP, "ses_1", ["--auto"], "/w")
+    assert t.cmd[:4] == ["/bin/opencode", "run", "--format", "json"]
+    assert (
+        t.cmd[t.cmd.index("--dir") + 1] == "/w" and t.cmd[t.cmd.index("--session") + 1] == "ses_1"
+    )
+    assert t.cmd[-1] == "--auto" and t.stdin == b"hi"
+    cfg = json.loads(t.env["OPENCODE_CONFIG_CONTENT"])
+    assert cfg["mcp"]["agentygg"]["command"] == ["/py", "-m", "agentygg.cli", "mcp"]
+    assert cfg["mcp"]["agentygg"]["environment"]["YGG_INSTANCE"] == "n1"
+    out = "\n".join(
+        json.dumps(e)
+        for e in [
+            {"type": "step_start", "sessionID": "ses_2"},
+            {"type": "text", "sessionID": "ses_2", "part": {"text": "PONG"}},
+        ]
+    )
+    r = h.parse(0, out, "")
+    assert r.ok and r.session_id == "ses_2" and r.summary == "PONG"
+    bad = h.parse(
+        1, json.dumps({"type": "error", "sessionID": "x", "error": {"message": "no provider"}}), ""
+    )
+    assert not bad.ok and bad.summary == "no provider"

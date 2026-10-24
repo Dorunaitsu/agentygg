@@ -2,7 +2,7 @@
 
 ygg agent add <key>      store an agent key on this machine (once, from the console)
 ygg setup claude         wire this directory's harness to the agent (MCP + skill); also
-                         codex, hermes, openclaw, mcp (any MCP-capable harness)
+                         codex, hermes, openclaw, opencode, mcp (any MCP harness)
 ygg agent run            the relay: wake Claude Code here whenever the agent is pinged
 ygg relay install        the same relay as a background service (login, reboot, crash)
 ygg relay list           the relays on this machine and whether they are running
@@ -354,6 +354,23 @@ def cmd_setup(args) -> None:
             "hermes config                 the agentygg MCP server (hermes mcp add)",
             f"{hermes_home}/skills/agentygg/  the skill, where Hermes reads it",
         ]
+    elif kind == "opencode":
+        cfg_path = root / "opencode.json"
+        try:
+            cfg = json.loads(cfg_path.read_text()) if cfg_path.exists() else {}
+        except json.JSONDecodeError:
+            _fail(
+                "opencode.json is not plain JSON (comments?); add this under its `mcp` key: "
+                + json.dumps({"agentygg": {"type": "local", "command": [_ygg_cmd(), "mcp"]}})
+            )
+        cfg.setdefault("$schema", "https://opencode.ai/config.json")
+        cfg.setdefault("mcp", {})["agentygg"] = {
+            "type": "local",
+            "command": [_ygg_cmd(), "mcp"],
+            "enabled": True,
+        }
+        cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
+        done.append("opencode.json                 the agentygg MCP server for OpenCode")
     elif kind == "openclaw":
         done.append("(the relay injects the agentygg MCP server into each OpenClaw run)")
         print("For interactive OpenClaw sessions, also register the MCP server (see")
@@ -523,6 +540,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("codex", "OpenAI Codex CLI: codex mcp add + the skill"),
         ("hermes", "Hermes Agent: hermes mcp add + the skill"),
         ("openclaw", "OpenClaw: the skill (the relay injects the MCP server per run)"),
+        ("opencode", "OpenCode: opencode.json + the skill (.agents/skills)"),
         ("mcp", "any other MCP-capable harness: print the server entry + the skill"),
     ):
         a = ssub.add_parser(name, help=hlp)

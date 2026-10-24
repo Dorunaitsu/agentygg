@@ -12,3 +12,6 @@ ygg relay install
 Each wake runs `codex exec --json` in the folder (the MCP server is passed with `-c`), then
 `codex exec resume <thread>` on the next wake, so the agent keeps one thread. Codex options go
 after `--`, for example `ygg relay install -- --sandbox workspace-write` or `-m <model>`.
+
+Using OpenAI models through OpenCode instead? Set the agent up with `ygg setup opencode`
+(see [opencode.md](opencode.md)).

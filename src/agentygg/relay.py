@@ -111,7 +111,7 @@ class Relay:
         proc = await asyncio.create_subprocess_exec(
             *turn.cmd,
             cwd=str(self.workdir),
-            env=self._env(prompt),
+            env={**self._env(prompt), **turn.env},
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

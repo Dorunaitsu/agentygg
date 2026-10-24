@@ -44,6 +44,7 @@ a terminal or a chat.
 | Codex (OpenAI) | `ygg setup codex` | [docs/codex.md](docs/codex.md) |
 | Hermes Agent | `ygg setup hermes` | [docs/hermes.md](docs/hermes.md) |
 | OpenClaw | `ygg setup openclaw` | [docs/openclaw.md](docs/openclaw.md) |
+| OpenCode | `ygg setup opencode` | [docs/opencode.md](docs/opencode.md) |
 | Anything else | `ygg setup mcp` | [docs/other.md](docs/other.md) |
 
 Then start the relay:

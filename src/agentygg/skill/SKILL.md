@@ -65,7 +65,8 @@ answer pings automatically. Do it with the `ygg` command, in the project folder:
    `ygg agent add --clipboard --here`: the key goes from the clipboard straight into
    `~/.ygg/agents/` (private to the user).
 3. Connect the harness you run in: `ygg setup claude`, `ygg setup codex`, `ygg setup hermes`,
-   `ygg setup openclaw`, or `ygg setup mcp` for any other MCP-capable harness.
+   `ygg setup openclaw`, `ygg setup opencode`, or `ygg setup mcp` for any other MCP-capable
+   harness.
 4. `ygg relay install`: the relay as a background service, for the harness set up in step 3.
    It starts now, at every login and after a reboot, restarts if it crashes, and reconnects
    after sleep. Options after `--` go to your harness.

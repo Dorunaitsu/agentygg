@@ -11,6 +11,8 @@ session next time. Three harnesses:
             stream-json --resume <session>`; MCP from its config (`ygg setup hermes`).
 * `openclaw` OpenClaw: `openclaw agent exec --message-file - --json --cwd <dir>`, MCP injected
             for the run with `--config-override`.
+* `opencode` OpenCode: `opencode run --format json --dir <dir> --session <id>` with the prompt
+            on stdin and the MCP server injected through OPENCODE_CONFIG_CONTENT.
 * `command` anything else (a local model, another harness, a script...): a shell command run
             per wake, with the prompt on stdin and in `$YGG_PROMPT`. It answers through the
             `agentygg` MCP server (configured in that harness) or `ygg send`.
@@ -31,7 +33,7 @@ from pathlib import Path
 
 from agentygg.render import skill_text
 
-KINDS = ("claude", "codex", "hermes", "openclaw", "command")
+KINDS = ("claude", "codex", "hermes", "openclaw", "opencode", "command")
 PROTOCOL_PREAMBLE = "You are connected to Agent'Ygg as an agent. Protocol:\n\n"
 
 
@@ -49,6 +51,7 @@ class Turn:
     cmd: list[str]
     stdin: bytes | None = None
     cleanup: list[str] = field(default_factory=list)  # temp files to delete afterwards
+    env: dict[str, str] = field(default_factory=dict)  # extra environment for this turn
 
 
 @dataclass
@@ -329,6 +332,66 @@ class OpenClaw(Harness):
 
 
 @dataclass
+class OpenCode(Harness):
+    path: str | None = None
+    kind = "opencode"
+    resumable = True
+
+    def exe(self) -> str:
+        try:
+            return find_executable(
+                self.path or "opencode",
+                [*_home_bins("opencode"), Path.home() / ".opencode" / "bin" / "opencode"],
+            )
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "cannot find OpenCode (`opencode`); install it (https://opencode.ai) or pass "
+                "--harness-path"
+            ) from None
+
+    def describe(self) -> str:
+        return f"OpenCode ({self.exe()})"
+
+    def prepare(self, prompt, mcp, session, extra, workdir):
+        if not session:
+            prompt = PROTOCOL_PREAMBLE + skill_text() + "\n\n---\n\n" + prompt
+        config = {
+            "mcp": {
+                "agentygg": {
+                    "type": "local",
+                    "command": [mcp.command, *mcp.args],
+                    "environment": mcp.env,
+                    "enabled": True,
+                }
+            }
+        }
+        cmd = [self.exe(), "run", "--format", "json", "--dir", workdir]
+        if session:
+            cmd += ["--session", session]
+        return Turn(
+            [*cmd, *extra],
+            prompt.encode(),
+            env={"OPENCODE_CONFIG_CONTENT": json.dumps(config)},
+        )
+
+    def parse(self, code, out, err):
+        session, texts, error = None, [], ""
+        for line in out.splitlines():
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            session = ev.get("sessionID") or session
+            if ev.get("type") == "text":
+                texts.append(((ev.get("part") or {}).get("text") or "").strip())
+            elif ev.get("type") == "error":
+                error = ((ev.get("error") or {}).get("message") or "error").strip()
+        ok = code == 0 and not error
+        summary = (texts[-1] if texts else "") if ok else (error or err.strip())
+        return TurnResult(ok, session or None, summary[:200])
+
+
+@dataclass
 class Command(Harness):
     """Any harness: a shell command per wake, prompt on stdin and in $YGG_PROMPT."""
 
@@ -364,6 +427,8 @@ def build(kind: str = "claude", path: str | None = None, command: str | None = N
         return Hermes(path)
     if kind == "openclaw":
         return OpenClaw(path)
+    if kind == "opencode":
+        return OpenCode(path)
     if kind == "command":
         if not command:
             raise ValueError("--harness command needs --cmd '<the command to run per wake>'")
