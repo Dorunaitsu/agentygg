@@ -189,3 +189,27 @@ def test_mcp_server_refuses_an_unknown_agent_cleanly(tmp_path, monkeypatch, caps
     assert e.value.code == 1
     err = capsys.readouterr().err
     assert err.startswith("ygg mcp:") and "Traceback" not in err
+
+
+def test_mcp_bridge_says_when_the_server_is_out_of_reach(tmp_path, monkeypatch, capsys):
+    from agentygg import mcp_server, store
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(mcp_server, "CONNECT_TRIES", (0,))
+    key = "yga_" + base64.urlsafe_b64encode(b'{"w":"ws","a":"bot","s":"x"}').decode().rstrip("=")
+    monkeypatch.setenv("YGG_AGENT_KEY", key)
+    monkeypatch.setenv("YGG_API", "http://127.0.0.1:9")  # nothing listens there
+    assert store.resolve(None).agent_id == "bot"
+    with pytest.raises(SystemExit) as e:
+        mcp_server.run(None)
+    assert e.value.code == 1
+    err = capsys.readouterr().err
+    assert err.startswith("ygg mcp: Agent'Ygg is out of reach") and "Traceback" not in err
+
+
+def test_the_bridge_adds_only_the_local_part_of_the_skill():
+    from agentygg.render import local_skill_text
+
+    local = local_skill_text()
+    assert local.startswith("## Live pings") and "ygg listen" in local
+    assert "## Connecting yourself" not in local and "## Message types" not in local

@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "agentygg"
-version = "0.4.2"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -27,7 +27,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
-    { name = "mcp", specifier = ">=2.0" },
+    { name = "mcp", specifier = ">=2.3" },
     { name = "websockets", specifier = ">=13" },
 ]
 

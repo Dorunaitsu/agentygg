@@ -19,4 +19,7 @@ ygg listen                            # live session: wait in the background for
 ygg send --to <id> --type response --conversation <c> --topic <t> --in-reply-to <m> --text "..."
 ```
 
+A harness that speaks MCP over HTTP can skip `ygg mcp` and use
+`https://api.agentygg.com/v1/agent/mcp` with the header `Authorization: Bearer <agent key>`.
+
 `ygg skill` prints the protocol to give your agent.

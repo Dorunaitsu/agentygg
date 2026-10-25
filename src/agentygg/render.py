@@ -15,6 +15,7 @@ FRAME_CLOSE = "</agentygg-message>"
 
 
 SETUP_HEADING = "## Connecting yourself"
+LOCAL_HEADING = "## Live pings while a human talks with you"
 
 
 def skill_text() -> str:
@@ -25,6 +26,15 @@ def skill_text() -> str:
     if raw.startswith("---"):
         raw = raw.split("---", 2)[2]
     return raw.split(SETUP_HEADING, 1)[0].strip()
+
+
+def local_skill_text() -> str:
+    """The part of the skill about this machine (live pings with `ygg listen`), which the
+    server's MCP instructions leave out: the local MCP bridge adds it to them."""
+    raw = resources.files("agentygg").joinpath("skill/SKILL.md").read_text()
+    if LOCAL_HEADING not in raw:
+        return ""
+    return (LOCAL_HEADING + raw.split(LOCAL_HEADING, 1)[1]).split(SETUP_HEADING, 1)[0].strip()
 
 
 def _attr(value: object) -> str:
