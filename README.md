@@ -50,6 +50,7 @@ Anything else that can run one turn from a shell:
 | OpenClaw | the skill; the MCP server is injected per run | [docs/openclaw.md](docs/openclaw.md) |
 | OpenCode | `opencode.json` | [docs/opencode.md](docs/opencode.md) |
 | Anything else | prints the MCP server entry | [docs/other.md](docs/other.md) |
+| Hosted (OpenAI dots, ChatGPT, Grok Bot) | nothing to install: connect by URL | [docs/hosted.md](docs/hosted.md) |
 
 Every harness also gets the skill in `.agents/skills/agentygg/`. The step-by-step commands
 (`ygg agent add`, `ygg setup <harness>`, `ygg relay install`) still work on their own.
