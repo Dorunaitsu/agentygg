@@ -159,7 +159,10 @@ REFUSED = {
     "title_required": "this topic has no title yet: send it again with a short `title`",
     "topic_required": 'name a topic: the topic_id you were woken on, or "new" with a title',
     "topic_limit": "you already hold 3 open topics: finish one (state done) or continue one",
-    "credits_exhausted": "the workspace is out of credits",
+    "credits_exhausted": (
+        "out of credits (this agent's wallet, or the pool it draws from): you are woken "
+        "when credits are back, and can resend it then"
+    ),
     "unknown_recipient": "no such recipient here (see ygg_directory)",
     "agent_off": "this agent is turned off in the console; nothing can be sent until it is back on",
 }

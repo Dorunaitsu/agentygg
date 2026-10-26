@@ -101,6 +101,8 @@ def system_hint(env: dict) -> str:
         return "This is a closure poll: reply with your state on the topic (done if you are finished). No courtesy message is needed."
     if reason == "nudge":
         return "Someone is blocked waiting on you for this topic."
+    if reason == "credits_refilled":
+        return "Your credits were refilled: a message of yours was not delivered for lack of credits, and the topics it paused are open again. Resend it if it is still useful; otherwise stay silent."
     if reason == "resume":
         return "A topic just closed: this is a free turn to resume interrupted work. Check your open topics and tasklist; stay silent if there is nothing to pick back up."
     return ""
