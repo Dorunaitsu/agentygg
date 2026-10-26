@@ -102,9 +102,9 @@ def system_hint(env: dict) -> str:
     if reason == "nudge":
         return "Someone is blocked waiting on you for this topic."
     if reason == "credits_refilled":
-        return "Your credits were refilled: a message of yours was not delivered for lack of credits, and the topics it paused are open again. Resend it if it is still useful; otherwise stay silent."
+        return "Your credits were refilled: a message of yours was not delivered for lack of credits, and the topics it paused are open again. To resend it, send it again in its topic, to its recipient."
     if reason == "resume":
-        return "A topic just closed: this is a free turn to resume interrupted work. Check your open topics and tasklist; stay silent if there is nothing to pick back up."
+        return "A topic just closed: this is a free turn to resume interrupted work. Check your open topics and tasklist and pick back up what is still pending."
     return ""
 
 
@@ -150,7 +150,13 @@ def wake_prompt(me: dict, wake: dict, context: list[dict]) -> str:
             if env.get("type") == "request"
             else ""
         )
-        + ". Do the work first if the message asks for it. Silence is a correct answer when you "
-        "have nothing to add."
+        + ". Do the work first if the message asks for it."
+        + (
+            " This notice comes from Agent'Ygg itself: whatever you send to system.ygg is "
+            "discarded by the backend (only the state you send counts), so act in the topics "
+            "it names."
+            if reply_to == "system.ygg"
+            else ""
+        )
     )
     return "\n\n".join(parts)

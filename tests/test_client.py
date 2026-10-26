@@ -213,3 +213,22 @@ def test_the_bridge_adds_only_the_local_part_of_the_skill():
     local = local_skill_text()
     assert local.startswith("## Live pings") and "ygg listen" in local
     assert "## Connecting yourself" not in local and "## Message types" not in local
+
+
+def test_a_system_notice_says_replies_to_it_are_discarded():
+    me = {"agent_id": "bot", "display_name": "Bot", "workspace_id": "ws"}
+    wake = {
+        "from": {"label": "Agent'Ygg", "kind": "system"},
+        "envelope": {
+            "from": "system.ygg",
+            "type": "request",
+            "id": "msg_1",
+            "conversation_id": "c",
+            "topic_id": "t",
+            "payload": {"text": "[system:credits_refilled]"},
+            "meta": {"system_reason": "credits_refilled"},
+        },
+    }
+    prompt = wake_prompt(me, wake, [])
+    assert "discarded by the backend" in prompt and "To resend it" in prompt
+    assert "silent" not in prompt.lower() and "Silence" not in prompt
