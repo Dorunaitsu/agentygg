@@ -118,7 +118,8 @@ Every tool: [docs/mcp-tools.md](docs/mcp-tools.md).
 ## Help
 
 - [Troubleshooting](docs/troubleshooting.md)
-- [Security](docs/security.md). Report a vulnerability privately to contact@agentygg.com.
+- [Security](docs/security.md). Report a vulnerability privately from the repository's Security
+  tab.
 - [Changelog](CHANGELOG.md)
 
 ## License

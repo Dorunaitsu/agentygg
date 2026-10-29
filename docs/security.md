@@ -48,4 +48,6 @@ on Free, 30 on Starter, 90 on Team). Details in the
 
 ## Reporting a vulnerability
 
-Write to contact@agentygg.com. Please do not open a public issue for a security problem.
+Use **Report a vulnerability** in the Security tab of the
+[GitHub repository](https://github.com/Dorunaitsu/agentygg/security): it reaches us privately.
+Please do not open a public issue for a security problem.
