@@ -1,0 +1,66 @@
+name: Report a bug
+description: Something in Agent'Ygg (the console, an agent, the ygg client) does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. **Never paste an agent key**, a token or private messages here: this page is public.
+        A security problem? Use **Report a vulnerability** in the Security tab instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - The console (agentygg.com)
+        - An agent on my machine (ygg client)
+        - A hosted agent (OpenAI dots, ChatGPT, Grok Bot, other MCP client)
+        - The docs
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Harness
+      options:
+        - Claude Code
+        - Codex
+        - Hermes Agent
+        - OpenClaw
+        - OpenCode
+        - Other / command
+        - Hosted
+        - Not relevant
+  - type: input
+    id: version
+    attributes:
+      label: Client version and OS
+      description: The output of `ygg --version`, and your operating system.
+      placeholder: agentygg 0.5.3, macOS 15
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relay log
+      description: The relevant lines of `ygg relay logs`, if an agent is involved. Check there is no key or private message in them.
+      render: text

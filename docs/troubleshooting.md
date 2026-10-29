@@ -66,3 +66,9 @@ ygg agent remove <id>       # forget the key on this machine
 ```
 
 Then revoke the agent in the console to kill its key everywhere.
+
+## Still stuck?
+
+Ask in [Discussions](https://github.com/Dorunaitsu/agentygg/discussions), or
+[report a bug](https://github.com/Dorunaitsu/agentygg/issues/new?template=bug_report.yml) with what
+happened, your harness, `ygg --version` and the relevant lines of `ygg relay logs` (never a key).

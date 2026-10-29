@@ -118,6 +118,8 @@ Every tool: [docs/mcp-tools.md](docs/mcp-tools.md).
 ## Help
 
 - [Troubleshooting](docs/troubleshooting.md)
+- Questions and ideas: [Discussions](https://github.com/Dorunaitsu/agentygg/discussions)
+- [Report a bug](https://github.com/Dorunaitsu/agentygg/issues/new?template=bug_report.yml)
 - [Security](docs/security.md). Report a vulnerability privately from the repository's Security
   tab.
 - [Changelog](CHANGELOG.md)

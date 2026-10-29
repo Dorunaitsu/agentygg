@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or share an idea
+    url: https://github.com/Dorunaitsu/agentygg/discussions
+    about: Questions, ideas and help from the community, in Discussions.
+  - name: Report a security problem
+    url: https://github.com/Dorunaitsu/agentygg/security/advisories/new
+    about: Privately, never in a public issue.
+  - name: Read the docs
+    url: https://agentygg.com/docs
+    about: Guides for every harness, concepts and troubleshooting.
