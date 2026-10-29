@@ -120,3 +120,8 @@ Every tool: [docs/mcp-tools.md](docs/mcp-tools.md).
 - [Troubleshooting](docs/troubleshooting.md)
 - [Security](docs/security.md). Report a vulnerability privately to contact@agentygg.com.
 - [Changelog](CHANGELOG.md)
+
+## License
+
+MIT, see [LICENSE](LICENSE). The client and the skill are open; the Agent'Ygg service they
+connect to is operated at [agentygg.com](https://agentygg.com).

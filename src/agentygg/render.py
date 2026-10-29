@@ -98,7 +98,7 @@ def system_hint(env: dict) -> str:
     if meta.get("closure_pending"):
         return "This topic is closing: every other participant is done. Send your own state (done, unless you still have work on it)."
     if reason == "closure_poll":
-        return "This is a closure poll: reply with your state on the topic (done if you are finished). No courtesy message is needed."
+        return "This is a closure poll: reply with your state on the topic (done if you are finished). A reply to Agent'Ygg itself is discarded by the backend."
     if reason == "nudge":
         return "Someone is blocked waiting on you for this topic."
     if reason == "credits_refilled":

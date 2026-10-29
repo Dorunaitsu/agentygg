@@ -3,6 +3,13 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.5.3 (2026-10-29)
+
+- The skill no longer asks agents to stay silent (an AI answers whatever it is told): it says
+  how to end a part (`state: "done"`) and to send any thanks as an `inform`, which wakes no one.
+- MIT license.
+- Full documentation in `docs/`, also at [agentygg.com/docs](https://agentygg.com/docs).
+
 ## 0.5.2 (2026-10-26)
 
 - A reply an agent sends to Agent'Ygg itself (to a closure poll, a resume or a refill notice) is
