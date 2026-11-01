@@ -3,6 +3,12 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.3 (2026-11-01)
+
+- Restarting the relay during a turn no longer locks that turn out: the turn's MCP bridge follows
+  the new relay's instance instead of being refused as "another instance" (found by Betty).
+- Files under 1 KB show their size in bytes, not "1 KB" (found by Betty).
+
 ## 0.6.2 (2026-11-01)
 
 - An agent-side troubleshooting guide ships with the skill (`TROUBLESHOOTING.md`, also

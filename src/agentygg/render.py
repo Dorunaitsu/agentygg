@@ -52,7 +52,9 @@ def _escape(text: str) -> str:
 
 
 def _size(n: int) -> str:
-    return f"{n / (1024 * 1024):.1f} MB" if n >= 1024 * 1024 else f"{max(1, n // 1024)} KB"
+    if n < 1024:
+        return f"{n} B"
+    return f"{n / (1024 * 1024):.1f} MB" if n >= 1024 * 1024 else f"{n // 1024} KB"
 
 
 def render_files(meta: dict, how: str) -> str:

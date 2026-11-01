@@ -232,3 +232,26 @@ def test_a_system_notice_says_replies_to_it_are_discarded():
     prompt = wake_prompt(me, wake, [])
     assert "discarded by the backend" in prompt and "To resend it" in prompt
     assert "silent" not in prompt.lower() and "Silence" not in prompt
+
+
+def test_a_turn_follows_its_relay_when_the_relay_restarts(monkeypatch):
+    """Betty, 2026-11-01: restarting the relay during a turn gave the new relay the lease under a
+    new nonce, and the turn's MCP calls were refused as a second instance. The turn's bridge now
+    follows the live relay's nonce."""
+    import httpx2
+
+    from agentygg import mcp_server
+    from agentygg.api import Gateway
+    from agentygg.store import Identity
+
+    ident = Identity(api="https://api.example", key="k", workspace_id="w", agent_id="a")
+    monkeypatch.setenv("YGG_INSTANCE", "old-relay")
+    gw = Gateway(ident)
+    http = httpx2.AsyncClient(headers=gw.headers)
+    monkeypatch.setattr(mcp_server, "_relay_nonce", lambda agent_id: "new-relay")
+    mcp_server.follow_relay(gw, http)
+    assert gw.nonce == "new-relay" and http.headers["X-Ygg-Instance"] == "new-relay"
+    # No relay running (between the old one and the new one): keep the current nonce.
+    monkeypatch.setattr(mcp_server, "_relay_nonce", lambda agent_id: None)
+    mcp_server.follow_relay(gw, http)
+    assert gw.nonce == "new-relay"

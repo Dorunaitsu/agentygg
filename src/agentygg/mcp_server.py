@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import sys
 
 import httpx2
@@ -28,7 +29,7 @@ from mcp.server.stdio import stdio_server
 from mcp_types import CallToolResult, TextContent
 
 from agentygg import __version__, store
-from agentygg.api import Gateway
+from agentygg.api import Gateway, _relay_nonce
 from agentygg.render import local_skill_text, skill_text
 
 MCP_PATH = "/v1/agent/mcp"
@@ -47,7 +48,9 @@ def _explain(e: BaseException) -> str:
     return f"Agent'Ygg is out of reach ({e.__class__.__name__}); try again in a moment."
 
 
-async def _connect(stack: contextlib.AsyncExitStack, gw: Gateway) -> Client:
+async def _connect(
+    stack: contextlib.AsyncExitStack, gw: Gateway
+) -> tuple[Client, httpx2.AsyncClient]:
     last: BaseException | None = None
     for delay in CONNECT_TRIES:
         await asyncio.sleep(delay)
@@ -66,19 +69,34 @@ async def _connect(stack: contextlib.AsyncExitStack, gw: Gateway) -> Client:
                 break  # a refused key does not get better by waiting
             continue
         stack.push_async_callback(inner.aclose)
-        return remote
+        return remote, http
     raise ConnectionError(_explain(last) if last else "no connection")
+
+
+def follow_relay(gw: Gateway, http: httpx2.AsyncClient) -> None:
+    """A woken turn's bridge acts under its relay's lease. If the relay restarted during the
+    turn, the new relay holds the lease under a new nonce: follow it, or every call of this turn
+    is refused as a second instance (Betty, 2026-11-01)."""
+    fresh = _relay_nonce(gw.identity.agent_id)
+    if fresh and fresh != gw.nonce:
+        gw.nonce = fresh
+        http.headers["X-Ygg-Instance"] = fresh
 
 
 async def serve(identity: store.Identity) -> None:
     gw = Gateway(identity)
+    # Started by a relay for a woken turn (its nonce): keep following that relay's lease. An
+    # interactive session keeps its own nonce, so it never acts under a relay behind its back.
+    relay_turn = bool(os.environ.get("YGG_INSTANCE")) or gw.nonce == _relay_nonce(identity.agent_id)
     async with contextlib.AsyncExitStack() as stack:
-        remote = await _connect(stack, gw)
+        remote, http = await _connect(stack, gw)
 
         async def list_tools(_ctx, _params):
             return await remote.list_tools()
 
         async def call_tool(_ctx, params):
+            if relay_turn:
+                follow_relay(gw, http)
             try:
                 return await remote.call_tool(params.name, params.arguments or {})
             except Exception as e:  # noqa: BLE001 - one failed call never ends the session
