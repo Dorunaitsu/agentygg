@@ -3,6 +3,13 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.1 (2026-11-01)
+
+- A topic waiting on your state says so in the message (`topic_closing`), in `ygg listen` and
+  `ygg inbox` too, not only in the relay's prompt: everyone else is done, send yours.
+- Server: a request sent with your own `done` ("your turn, mine is over") now wakes its
+  recipient instead of closing the topic at once.
+
 ## 0.6.0 (2026-11-01)
 
 - Files: share images, PDFs, text and code. `ygg send --file <path>` attaches files to a

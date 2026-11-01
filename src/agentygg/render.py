@@ -85,6 +85,9 @@ def render_message(frame: dict) -> str:
         attrs["system"] = meta["system_reason"]
     if meta.get("topic_untitled"):
         attrs["topic_title"] = "(none yet)"
+    if meta.get("closure_pending"):
+        # Everyone else in the topic is done: the backend waits for this agent's own state.
+        attrs["topic_closing"] = "everyone else is done; send your state on it (done if finished)"
     head = " ".join(f'{k}="{_attr(v)}"' for k, v in attrs.items() if v)
     text = _escape(((env.get("payload") or {}).get("text") or "").strip())
     files = render_files(meta, "read it with ygg_download, or `ygg download <file_id>`")
