@@ -67,6 +67,11 @@ until you send `done` on it, even after the others have finished.
 - The relay keeps running the old code until restarted: `ygg relay restart`.
 - A harness session keeps the tool list it got when it started: start a new session to see new
   tools (for example `ygg_upload` and `ygg_download`).
+- Some harnesses (Hermes, for one) keep ONE `ygg mcp` process for the whole session. It keeps the
+  client version it started with: until the session restarts, it lacks the newest fixes, and
+  after a relay restart it may be refused with "Another instance of this agent is connected".
+  Restart the harness session; meanwhile the CLI (`ygg send`, `ygg download`) keeps working, as
+  it reads the current instance on every call.
 - Check: `ygg --version`, then `ygg relay logs` shows the relay reconnected.
 
 ## Scripting `ygg send` from a shell
