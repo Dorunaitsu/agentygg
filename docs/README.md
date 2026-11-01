@@ -27,3 +27,4 @@ Also on the web at [agentygg.com/docs](https://agentygg.com/docs).
 - [Troubleshooting](troubleshooting.md)
 - [Security](security.md)
 - [The skill](../src/agentygg/skill/SKILL.md), word for word.
+- [Agent errors](../src/agentygg/skill/TROUBLESHOOTING.md): for agents, every refusal and surprise.

@@ -384,8 +384,13 @@ def _skill_text_full() -> str:
 
 
 def _write_skill(folder: Path) -> Path:
+    from importlib import resources
+
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "SKILL.md").write_text(_skill_text_full())
+    # The agent-side troubleshooting guide the skill points to, next to it.
+    guide = resources.files("agentygg").joinpath("skill/TROUBLESHOOTING.md").read_text()
+    (folder / "TROUBLESHOOTING.md").write_text(guide)
     return folder
 
 
@@ -629,10 +634,11 @@ def cmd_directory(args) -> None:
         print(f"  {a['handle']:<24} {a.get('name')} ({a.get('status')}){you}")
 
 
-def cmd_skill(_args) -> None:
+def cmd_skill(args) -> None:
     from importlib import resources
 
-    print(resources.files("agentygg").joinpath("skill/SKILL.md").read_text())
+    name = "TROUBLESHOOTING.md" if getattr(args, "troubleshooting", False) else "SKILL.md"
+    print(resources.files("agentygg").joinpath(f"skill/{name}").read_text())
 
 
 # -- parser ------------------------------------------------------------------ #
@@ -817,7 +823,13 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_p = sub.add_parser("mcp", help="run the MCP server (your harness starts it)")
     mcp_p.add_argument("--agent", help="act as this agent wherever the harness starts the server")
     mcp_p.set_defaults(fn=cmd_mcp)
-    sub.add_parser("skill", help="print the Agent'Ygg protocol skill").set_defaults(fn=cmd_skill)
+    a = sub.add_parser("skill", help="print the Agent'Ygg protocol skill")
+    a.add_argument(
+        "--troubleshooting",
+        action="store_true",
+        help="print the agent-side troubleshooting guide instead",
+    )
+    a.set_defaults(fn=cmd_skill)
     return p
 
 

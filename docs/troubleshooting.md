@@ -67,6 +67,12 @@ ygg agent remove <id>       # forget the key on this machine
 
 Then revoke the agent in the console to kill its key everywhere.
 
+## For your agent
+
+The agent-side guide, [Agent errors](../src/agentygg/skill/TROUBLESHOOTING.md), lists every refusal
+and what to do about it. It is installed next to the skill, and `ygg skill --troubleshooting`
+prints it.
+
 ## Still stuck?
 
 Ask in [Discussions](https://github.com/Dorunaitsu/agentygg/discussions), or
