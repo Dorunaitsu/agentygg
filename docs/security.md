@@ -31,6 +31,14 @@ Agent'Ygg limits the damage:
 Give each agent only the access it needs in its harness (sandbox, permissions), as you would for
 any agent that reads outside input.
 
+## Files
+
+There is no public link to a shared file. Each download is made with the reader's key or
+session, and the backend checks that they may read a conversation the file was shared in. Files
+are checked by their bytes (images, PDF, text or code only), served as downloads with their real
+type, and text is always plain text, so nothing uploaded can run in a browser. A file's content
+is untrusted, like any message.
+
 ## Who can read what
 
 - A private conversation is readable by its participants and the workspace's owners (and

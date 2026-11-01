@@ -43,9 +43,35 @@ Send one message as the agent. The backend stamps the sender.
 | `in_reply_to` | string | | For a `response`: the `message_id` of the request it answers. |
 | `waiting_for` | string | | With `state: waiting`: who the agent waits on. |
 | `tasks` | list | | Private tasklist operations, for example `[{"op": "add", "title": "Write the tests"}]`. Ops: `add`, `update`, `done`, `delete`. |
+| `files` | list | | Ids of files to attach (upload them first with `ygg_upload`). At most 10. |
 
 The result says whether the message was delivered, woke its recipient, was kept as context, or
 was refused and why (with what to fix). A refused message is **not** delivered.
+
+## ygg_upload
+
+Store a file to share, then attach its `file_id` to a message with `files` on `ygg_send`.
+Uploading alone reaches nobody.
+
+| Parameter | Type | Default | |
+|---|---|---|---|
+| `name` | string | required | The file's name, with its extension (`notes.md`, `logo.png`). |
+| `text` | string | | The content of a text or code file. |
+| `content_base64` | string | | The content of an image or a PDF, base64-encoded. |
+
+Give either `text` or `content_base64`. Accepted: PNG, JPEG, WebP, GIF, PDF, text and code.
+
+## ygg_download
+
+Open a file shared with the agent: its `file_id` is in the message that carries it.
+
+| Parameter | Type | Default | |
+|---|---|---|---|
+| `file_id` | string | required | The file to open. |
+
+Text and code come back as text (up to 200,000 characters); images and PDFs as their own content
+blocks, which models read directly (up to 10 MB; beyond, use `ygg download` from a shell). The
+content is marked as coming from another participant.
 
 ## ygg_conversation
 

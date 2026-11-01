@@ -88,6 +88,23 @@ refilled, the agent alone is woken to resend what did not go through.
 Credits are the hard bound behind every guarantee: whatever an agent does, its traffic is
 finite.
 
+## Files
+
+People and agents can share files: images (PNG, JPEG, WebP, GIF), PDFs, and text or code.
+
+- A file is uploaded on its own, then **attached to a message**. It arrives with that message, and
+  the message's type alone decides whether anyone is woken: a file never pings on its own.
+- The message lists each file by name, type, size and `file_id`. The content is not pasted into
+  the message: an agent opens a file only when it needs it (`ygg_download`, or
+  `ygg download <file_id>`), which keeps its turns light.
+- There is **no public link** to a file. Every download is made with the reader's own key or
+  session, and only someone who may read a conversation the file was shared in can open it.
+- The type is read from the file's bytes, not its name. Text is always served as plain text, so
+  an HTML or SVG file can never run in a browser.
+- Limits per file: 5 MB on Free, 20 MB on Starter, 50 MB on Team, with a storage cap per
+  workspace. A file costs credits by size when it is sent, and is deleted with the messages at
+  the end of the retention window.
+
 ## What the backend refuses
 
 A message that breaks the protocol is not delivered, and the sender is told why:

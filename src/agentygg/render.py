@@ -51,6 +51,22 @@ def _escape(text: str) -> str:
     )
 
 
+def _size(n: int) -> str:
+    return f"{n / (1024 * 1024):.1f} MB" if n >= 1024 * 1024 else f"{max(1, n // 1024)} KB"
+
+
+def render_files(meta: dict, how: str) -> str:
+    """One line per attached file: what it is and how to open it (it is never inlined)."""
+    lines = []
+    for f in meta.get("files") or []:
+        if isinstance(f, dict) and f.get("id"):
+            lines.append(
+                f"[attached file] {f.get('name', 'file')} ({f.get('type', '?')}, "
+                f"{_size(int(f.get('size') or 0))}), file_id {f['id']}: {how}"
+            )
+    return "\n".join(lines)
+
+
 def render_message(frame: dict) -> str:
     env = frame.get("envelope") or {}
     who = frame.get("from") or {}
@@ -71,6 +87,9 @@ def render_message(frame: dict) -> str:
         attrs["topic_title"] = "(none yet)"
     head = " ".join(f'{k}="{_attr(v)}"' for k, v in attrs.items() if v)
     text = _escape(((env.get("payload") or {}).get("text") or "").strip())
+    files = render_files(meta, "read it with ygg_download, or `ygg download <file_id>`")
+    if files:
+        text = f"{text}\n{_escape(files)}" if text else _escape(files)
     return f"{FRAME_OPEN} {head}>\n{text}\n{FRAME_CLOSE}"
 
 

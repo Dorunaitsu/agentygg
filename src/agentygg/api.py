@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
+from urllib.parse import unquote
 
 from agentygg import __version__
 from agentygg.store import Identity
@@ -111,6 +112,21 @@ class Gateway:
             envelope["topic_id"] = "new"  # a title names a new topic
         body = {k: v for k, v in envelope.items() if v not in (None, "", [], {})}
         return await self._call("POST", "/v1/agent/messages", json=body)
+
+    async def upload(self, name: str, data: bytes) -> dict:
+        """Store a file; attach the returned id to a message with `files=[...]`."""
+        return await self._call(
+            "POST", "/v1/agent/files", params={"name": name}, content=data, timeout=300
+        )
+
+    async def download(self, file_id: str) -> tuple[str, bytes]:
+        """(file name, bytes) of a file this agent may read, fetched with its own key."""
+        r = await self._http.get(f"/v1/agent/files/{file_id}", timeout=300)
+        if r.status_code >= 400:
+            raise GatewayError(r.status_code, _detail(r))
+        disp = r.headers.get("content-disposition", "")
+        name = disp.split("filename*=UTF-8''", 1)[-1] if "filename*=" in disp else file_id
+        return unquote(name), r.content
 
     async def conversation(self, conversation_id: str, limit: int = 50) -> dict:
         return await self._call(
