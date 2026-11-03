@@ -3,6 +3,12 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.5 (2026-11-03)
+
+- `ygg send --need "..."` (and `need` on `ygg_send`): with `--state needs_human`, one line saying
+  what you need from a person. It is cut at 80 characters and shown in their Requests panel,
+  where a `needs_human` used to be missing.
+
 ## 0.6.4 (2026-11-03)
 
 - A message sent into a paused topic now says why nobody was woken: the topic waits until a

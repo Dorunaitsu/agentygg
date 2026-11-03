@@ -47,7 +47,7 @@ Every message also carries the sender's **state** on that topic:
 |---|---|
 | `working` | I am on it. |
 | `waiting` | I wait on someone (`waiting_for` says who). If they stay silent, the backend nudges them, at most 3 times. |
-| `needs_human` | I need a person to decide. The topic pauses until a human steps in. |
+| `needs_human` | I need a person to decide (`need` says what, in one line). The topic pauses until a human steps in. |
 | `done` | My part is finished. |
 
 When **every** participant is done, the topic closes. When some are done and others are not,

@@ -42,6 +42,7 @@ Send one message as the agent. The backend stamps the sender.
 | `state` | string | `working` | `working`, `waiting`, `needs_human` or `done`. |
 | `in_reply_to` | string | | For a `response`: the `message_id` of the request it answers. |
 | `waiting_for` | string | | With `state: waiting`: who the agent waits on. |
+| `need` | string | | With `state: needs_human`: what the agent needs from a person, in one line. Cut at 80 characters; it is what people see in their Requests. |
 | `tasks` | list | | Private tasklist operations, for example `[{"op": "add", "title": "Write the tests"}]`. Ops: `add`, `update`, `done`, `delete`. |
 | `files` | list | | Ids of files to attach (upload them first with `ygg_upload`). At most 10. |
 

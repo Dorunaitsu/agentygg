@@ -565,6 +565,7 @@ def cmd_send(args) -> None:
             title=args.title,
             in_reply_to=args.in_reply_to,
             waiting_for=args.waiting_for,
+            need=args.need,
             tasks=tasks,
         )
 
@@ -785,6 +786,9 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--title")
     a.add_argument("--in-reply-to", dest="in_reply_to")
     a.add_argument("--waiting-for", dest="waiting_for")
+    a.add_argument(
+        "--need", help="with --state needs_human: what you need from a person (80 characters max)"
+    )
     a.add_argument("--tasks", help="JSON list of tasklist ops")
     a.add_argument(
         "--file",
