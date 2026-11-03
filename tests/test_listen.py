@@ -3,6 +3,7 @@ pings (system notices never end the wait), and a relay for the same agent steps 
 that session listens, so the two never race for a wake."""
 
 import asyncio
+import os
 import types
 
 import pytest
@@ -146,6 +147,25 @@ def test_listen_refuses_inside_a_relay_turn(home, monkeypatch):
     monkeypatch.setenv("YGG_RELAY", "1")
     with pytest.raises(SystemExit):
         cli.cmd_listen(types.SimpleNamespace(agent="bot", all=False, timeout=0.0))
+
+
+def test_listen_stops_when_the_process_it_serves_is_gone(home):
+    """A plugin passes its harness's pid: once that process is gone, nobody would read what we
+    take, so we stop at once and hand the pings back to the relay."""
+    gw = FakeGw([{"wakes": [], "mailbox": []}])
+    out = []
+    assert asyncio.run(lst.listen(gw, out=out.append, alive=lambda: False)) == lst.STOPPED
+    assert not store.listener_active(gw.identity.agent_id)
+
+
+def test_pid_alive_tells_a_live_process_from_a_gone_one():
+    import subprocess
+    import sys
+
+    assert store.pid_alive(os.getpid())
+    p = subprocess.Popen([sys.executable, "-c", "pass"])
+    p.wait()
+    assert not store.pid_alive(p.pid)
 
 
 def test_a_refused_send_never_reads_as_delivered():

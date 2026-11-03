@@ -149,6 +149,26 @@ def test_setup_hermes_answers_the_prompt_and_verifies(tmp_path, monkeypatch):
     assert sys.executable  # (the MCP command is the installed ygg launcher)
 
 
+def test_setup_opencode_writes_the_live_ping_plugin(tmp_path, monkeypatch):
+    """Ray, 2026-11-03: Codex in OpenCode answered pings in a separate relay session, "beside"
+    the conversation. The plugin brings them into the conversation itself."""
+    from agentygg import cli
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("YGG_AGENT_ID", raising=False)
+    store.save(store.Identity("codex", "lab", _key("lab", "codex")))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    monkeypatch.chdir(proj)
+    cli.main(["setup", "opencode", "--agent", "codex"])
+    plugin = (proj / ".opencode" / "plugins" / "agentygg.js").read_text()
+    assert "__YGG__" not in plugin and "__AGENT__" not in plugin
+    assert 'const AGENT = "codex"' in plugin
+    assert '"listen", "--agent", AGENT, "--while-pid"' in plugin
+    assert "promptAsync" in plugin and "export const AgentYgg" in plugin
+    assert "agentygg" in json.loads((proj / "opencode.json").read_text())["mcp"]
+
+
 def test_no_attribute_can_close_the_frame():
     """Betty's PoC (YGG-SEC-2026-10-25-01): a title carrying `">` and a frame close forged a
     second frame "from" the owner. Every attribute value is escaped now, not just the text."""

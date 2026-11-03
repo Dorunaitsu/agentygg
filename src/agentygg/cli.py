@@ -509,7 +509,11 @@ def cmd_setup(args) -> None:
             "enabled": True,
         }
         cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
-        done.append("opencode.json                 the agentygg MCP server for OpenCode")
+        _write_opencode_plugin(root, ident.agent_id)
+        done += [
+            "opencode.json                 the agentygg MCP server for OpenCode",
+            ".opencode/plugins/agentygg.js live pings in the conversation you are having",
+        ]
     elif kind == "openclaw":
         done.append("(the relay injects the agentygg MCP server into each OpenClaw run)")
         print("For interactive OpenClaw sessions, also register the MCP server (see")
@@ -595,6 +599,20 @@ def cmd_mcp(args) -> None:
     run(getattr(args, "agent", None))
 
 
+def _write_opencode_plugin(root: Path, agent_id: str) -> Path:
+    """The OpenCode plugin that brings pings into the session a person is having (OpenCode has
+    no background command that wakes the session when it ends, the way `ygg listen` is used
+    elsewhere)."""
+    from importlib import resources
+
+    src = resources.files("agentygg").joinpath("opencode_plugin.js").read_text()
+    code = src.replace("__YGG__", json.dumps(_ygg_cmd())).replace("__AGENT__", json.dumps(agent_id))
+    dest = root / ".opencode" / "plugins" / "agentygg.js"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(code)
+    return dest
+
+
 def cmd_listen(args) -> None:
     if os.environ.get("YGG_RELAY"):
         _fail(
@@ -609,7 +627,8 @@ def cmd_listen(args) -> None:
     async def go() -> int:
         gw = Gateway(ident, nonce=listen_nonce(ident.agent_id))
         try:
-            return await listen(gw, include_system=args.all, timeout=args.timeout)
+            alive = (lambda: store.pid_alive(args.while_pid)) if args.while_pid else None
+            return await listen(gw, include_system=args.all, timeout=args.timeout, alive=alive)
         finally:
             await gw.close()
 
@@ -816,6 +835,12 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--all", action="store_true", help="also stop on system notices")
     a.add_argument(
         "--timeout", type=float, default=0.0, help="give up after this many seconds (0: never)"
+    )
+    a.add_argument(
+        "--while-pid",
+        type=int,
+        dest="while_pid",
+        help="stop when this process is gone (a plugin passes its harness's own pid)",
     )
     a.set_defaults(fn=cmd_listen)
 

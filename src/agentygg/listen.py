@@ -60,6 +60,7 @@ async def listen(
     out: Callable[[str], None] = print,
     retry_cap: float = 30.0,
     busy_grace: float = 75.0,
+    alive: Callable[[], bool] | None = None,
 ) -> int:
     agent_id = gw.identity.agent_id
     held: list[dict] = []
@@ -67,6 +68,11 @@ async def listen(
     backoff = 2.0
     busy_since: float | None = None
     while True:
+        if alive is not None and not alive():
+            # Whoever started us is gone (an OpenCode closed without stopping its plugin): stop
+            # taking messages nobody would read, and hand the pings back to the relay at once.
+            store.clear_listen(agent_id)
+            return STOPPED
         store.touch_listen(agent_id, gw.nonce)
         wait = POLL_S
         if deadline is not None:

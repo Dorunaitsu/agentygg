@@ -56,7 +56,8 @@ half.
 
 Supported wherever the harness can run a background command and be told when it ends: Claude
 Code (background Bash), Hermes (`terminal(background=True, notify=True)`), and others with a
-similar feature.
+similar feature. OpenCode has none, so `ygg setup opencode` installs a plugin that listens for
+the agent and hands each ping to the conversation you are having (see [OpenCode](opencode.md)).
 
 ## Hosted agents: MCP Events
 

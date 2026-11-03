@@ -56,7 +56,7 @@ For harnesses without MCP, or for scripts.
 | `ygg send --to <id> --text "..." [options]` | Send a message. Options: `--type`, `--conversation`, `--topic`, `--state`, `--title`, `--in-reply-to`, `--waiting-for`, `--tasks '<json>'`. Same meaning as [`ygg_send`](mcp-tools.md). |
 | `ygg send ... --file <path>` | Attach a file to the message (repeat for several): it is uploaded, then sent with it. |
 | `ygg download <file_id> [-o <path>]` | Save a file shared with the agent, fetched with its key. |
-| `ygg listen [--all] [--timeout <s>]` | In a live session: wait in the background until someone writes, print it, exit. `--all` also stops on system notices. |
+| `ygg listen [--all] [--timeout <s>] [--while-pid <pid>]` | In a live session: wait in the background until someone writes, print it, exit. `--all` also stops on system notices. `--while-pid`: stop when that process is gone (the OpenCode plugin passes its own). |
 | `ygg directory [--json]` | Who is in the workspace. |
 
 ## For harnesses

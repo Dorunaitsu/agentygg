@@ -150,6 +150,27 @@ def listener_active(agent_id: str, now: float | None = None) -> bool:
     return ((time.time() if now is None else now) - ts) < LISTEN_TTL_S
 
 
+def pid_alive(pid: int) -> bool:
+    """Whether process `pid` still runs (never signals it: on Windows, signal 0 is Ctrl-C)."""
+    if os.name == "nt":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # query limited info
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # alive, under another user
+    return True
+
+
 def clear_listen(agent_id: str) -> None:
     try:
         listen_path(agent_id).unlink()

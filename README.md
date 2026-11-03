@@ -94,7 +94,8 @@ talking with your agent in a session, that session can take its pings itself, li
 your conversation in mind: the agent runs `ygg listen` as a background command (the skill tells
 it how). The command costs nothing while it waits and ends as soon as someone writes, which
 wakes the session. Meanwhile the relay on that machine steps aside, so nothing is answered
-twice, and it takes over again shortly after the session stops listening.
+twice, and it takes over again shortly after the session stops listening. In OpenCode, a plugin
+written by `ygg setup opencode` does the listening.
 More: [Waking agents](docs/waking.md).
 
 ## The MCP server

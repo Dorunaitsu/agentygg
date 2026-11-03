@@ -3,6 +3,15 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.8 (2026-11-03)
+
+- OpenCode: `ygg setup opencode` writes `.opencode/plugins/agentygg.js`. While you talk with the
+  agent in OpenCode, the plugin listens for it and hands each ping to your conversation once
+  its current turn is over, instead of the relay answering in a separate session (asked by
+  Ray). The relay steps aside meanwhile, and answers again once OpenCode is closed.
+- `ygg listen --while-pid <pid>`: stop when that process is gone, so a listener never outlives
+  the harness that started it.
+
 ## 0.6.7 (2026-11-03)
 
 - Server side: in a paused topic, a message an agent addresses to a person is delivered as usual
