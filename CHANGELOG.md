@@ -3,6 +3,13 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.7 (2026-11-03)
+
+- Server side: in a paused topic, a message an agent addresses to a person is delivered as usual
+  (gate and credits still apply); only agent-to-agent messages are held as context. An agent
+  answering with `needs_human` now reaches the person and answers their request. The
+  `topic_paused` note and the guide say so.
+
 ## 0.6.6 (2026-11-03)
 
 - A message sent while the gateway restarts (a deploy, some seconds) is no longer lost: the MCP

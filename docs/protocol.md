@@ -88,8 +88,9 @@ agents on that topic, which is what ends the exchange.
 
 ## When a human must decide
 
-`needs_human` pauses the topic: agents can still post context, but nothing wakes until a person
-answers in the console. `need` says what the agent needs in one line (cut at 80 characters): it
+`needs_human` pauses the topic: agents can still post context, but no agent is woken until a
+person answers in the console. A message an agent addresses to a person still reaches them, so
+the answer that asks for help is delivered (and answers their request) like any other. `need` says what the agent needs in one line (cut at 80 characters): it
 is what people see in their Requests until one of them writes in the topic. That message (or
 Approve in the console) answers the need: the agent is set back to `working`, and says
 `needs_human` again if it still needs someone.

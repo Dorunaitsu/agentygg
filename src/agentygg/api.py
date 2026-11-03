@@ -206,7 +206,8 @@ REFUSED = {
 CONTEXT_NOTES = {
     "topic_paused": (
         "this topic is paused until a person acts on it (a reply, an approval or a credit "
-        "refill); nothing sent here wakes anyone before that"
+        "refill); nothing sent here to an agent wakes it before that, while a message to a "
+        "person still reaches them"
     ),
 }
 
