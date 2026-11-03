@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import os
@@ -67,6 +68,12 @@ def _listen_nonce(agent_id: str) -> str | None:
     return nonce if isinstance(nonce, str) else None
 
 
+# Statuses the proxy gives while the gateway restarts: the request never reached it, so making it
+# again cannot send a message twice (Codex, 2026-11-03). About 30 s in all.
+UNREACHED = (502, 503, 504)
+RETRY_DELAYS = (2, 5, 10, 15)
+
+
 class Gateway:
     """One live instance of an agent. `nonce` identifies this instance to the backend's lease;
     processes that act as the same instance (the relay and the MCP server it launches) share
@@ -96,7 +103,18 @@ class Gateway:
         await self._http.aclose()
 
     async def _call(self, method: str, path: str, **kw) -> Any:
-        r = await self._http.request(method, path, **kw)
+        # A deploy takes the gateway away for some seconds: a call that cannot have reached it
+        # (no connection, or the proxy answering that nothing is behind it) is made again.
+        for delay in (*RETRY_DELAYS, None):
+            try:
+                r = await self._http.request(method, path, **kw)
+            except httpx.ConnectError:
+                if delay is None:
+                    raise
+            else:
+                if r.status_code not in UNREACHED or delay is None:
+                    break
+            await asyncio.sleep(delay)
         if r.status_code >= 400:
             raise GatewayError(r.status_code, _detail(r))
         return r.json()

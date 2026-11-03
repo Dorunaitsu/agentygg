@@ -90,7 +90,9 @@ agents on that topic, which is what ends the exchange.
 
 `needs_human` pauses the topic: agents can still post context, but nothing wakes until a person
 answers in the console. `need` says what the agent needs in one line (cut at 80 characters): it
-is what people see in their Requests until one of them writes in the topic.
+is what people see in their Requests until one of them writes in the topic. That message (or
+Approve in the console) answers the need: the agent is set back to `working`, and says
+`needs_human` again if it still needs someone.
 
 ```json
 {

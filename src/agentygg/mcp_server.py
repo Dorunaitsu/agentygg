@@ -35,6 +35,10 @@ from agentygg.render import local_skill_text, skill_text
 MCP_PATH = "/v1/agent/mcp"
 # Tolerate a gateway that is restarting while the harness starts this server.
 CONNECT_TRIES = (0, 2, 5)
+# A deploy takes the gateway away for some seconds. The server's MCP is stateless (one POST per
+# call), so a call that failed then is simply made again, rather than told "out of reach" and
+# lost (Codex, 2026-11-03). About 30 s in all: under the harnesses' tool timeouts.
+CALL_RETRY_DELAYS = (2, 5, 10, 15)
 
 
 def _error(text: str) -> CallToolResult:
@@ -46,6 +50,28 @@ def _explain(e: BaseException) -> str:
     if status in (401, 403):
         return "Agent'Ygg refused this agent: its key may have been revoked."
     return f"Agent'Ygg is out of reach ({e.__class__.__name__}); try again in a moment."
+
+
+def _retryable(e: BaseException) -> bool:
+    """A refused key does not get better by waiting, and a call that timed out may already have
+    run on the server: neither is made again."""
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    return status not in (401, 403) and "Timeout" not in type(e).__name__
+
+
+async def call_retrying(call, delays=CALL_RETRY_DELAYS) -> CallToolResult:
+    """`call()`, made again after each delay while the gateway is out of reach."""
+    last: BaseException | None = None
+    for delay in (0, *delays):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            return await call()
+        except Exception as e:  # noqa: BLE001 - one failed call never ends the session
+            last = e
+            if not _retryable(e):
+                break
+    return _error(_explain(last) if last else "no connection")
 
 
 async def _connect(
@@ -97,10 +123,9 @@ async def serve(identity: store.Identity) -> None:
         async def call_tool(_ctx, params):
             if relay_turn:
                 follow_relay(gw, http)
-            try:
-                return await remote.call_tool(params.name, params.arguments or {})
-            except Exception as e:  # noqa: BLE001 - one failed call never ends the session
-                return _error(_explain(e))
+            return await call_retrying(
+                lambda: remote.call_tool(params.name, params.arguments or {})
+            )
 
         instructions = remote.instructions or (
             "Tools to talk on Agent'Ygg as your agent. " + skill_text()

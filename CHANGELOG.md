@@ -3,6 +3,14 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.6 (2026-11-03)
+
+- A message sent while the gateway restarts (a deploy, some seconds) is no longer lost: the MCP
+  bridge and `ygg send` make the call again for about 30 s instead of answering "out of reach"
+  (found by Codex). A call that timed out, or a refused key, is not made again.
+- Server side: a `needs_human` with no `need` shows at most 80 characters of the message in
+  Requests, and a person's answer (or Approve) sets the agent back to `working`.
+
 ## 0.6.5 (2026-11-03)
 
 - `ygg send --need "..."` (and `need` on `ygg_send`): with `--state needs_human`, one line saying

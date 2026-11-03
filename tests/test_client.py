@@ -1,9 +1,11 @@
 """Client-side guarantees that need no server: the key decodes to its identity, a directory
 finds its agent, and a message can never break out of its provenance frame."""
 
+import asyncio
 import base64
 import json
 import os
+import types
 
 import pytest
 
@@ -205,6 +207,85 @@ def test_mcp_bridge_says_when_the_server_is_out_of_reach(tmp_path, monkeypatch, 
     assert e.value.code == 1
     err = capsys.readouterr().err
     assert err.startswith("ygg mcp: Agent'Ygg is out of reach") and "Traceback" not in err
+
+
+def test_a_call_made_while_the_gateway_restarts_goes_through_once_it_is_back():
+    """Codex, 2026-11-03: a message sent during a deploy came back "out of reach" and was lost
+    until the model resent it. The bridge makes the call again while the gateway is away."""
+    from agentygg import mcp_server
+
+    attempts = []
+
+    async def call():
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise ConnectionError("gateway restarting")
+        return "sent"
+
+    assert asyncio.run(mcp_server.call_retrying(call, delays=(0.01, 0.01, 0.01))) == "sent"
+    assert len(attempts) == 3
+
+
+def test_ygg_send_during_a_deploy_waits_for_the_gateway(monkeypatch):
+    """The proxy answers 502 while the backend restarts: the request never reached it, so the
+    client makes it again instead of failing the send."""
+    import httpx
+
+    from agentygg import api
+
+    monkeypatch.setattr(api, "RETRY_DELAYS", (0.01, 0.01, 0.01))
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        if len(seen) < 3:
+            return httpx.Response(502, text="no available server")
+        return httpx.Response(200, json={"verdict": "WAKE", "reason": "ok_wake"})
+
+    key = "yga_" + base64.urlsafe_b64encode(b'{"w":"ws","a":"bot","s":"x"}').decode().rstrip("=")
+    gw = api.Gateway(
+        store.Identity(agent_id="bot", workspace_id="ws", key=key, api="http://gw"), nonce="n"
+    )
+    gw._http = httpx.AsyncClient(base_url="http://gw", transport=httpx.MockTransport(handler))
+    r = asyncio.run(gw.send(type="inform", to="human.1", text="hi"))
+    assert r["verdict"] == "WAKE" and seen == ["/v1/agent/messages"] * 3
+
+    seen.clear()
+    gw._http = httpx.AsyncClient(
+        base_url="http://gw", transport=httpx.MockTransport(lambda q: httpx.Response(409))
+    )
+    with pytest.raises(api.GatewayError):
+        asyncio.run(gw.send(type="inform", to="human.1", text="hi"))
+
+
+def test_a_refused_key_or_a_timed_out_call_is_not_made_again():
+    from agentygg import mcp_server
+
+    class Refused(Exception):
+        response = types.SimpleNamespace(status_code=401)
+
+    class ReadTimeout(Exception):
+        pass
+
+    for exc in (Refused, ReadTimeout):
+        attempts = []
+
+        async def call(exc=exc, attempts=attempts):
+            attempts.append(1)
+            raise exc()
+
+        out = asyncio.run(mcp_server.call_retrying(call, delays=(0.01, 0.01)))
+        assert out.is_error and len(attempts) == 1
+
+
+def test_a_gateway_that_stays_away_is_reported_after_the_retries():
+    from agentygg import mcp_server
+
+    async def call():
+        raise ConnectionError("down")
+
+    out = asyncio.run(mcp_server.call_retrying(call, delays=(0.01, 0.01)))
+    assert out.is_error and "out of reach" in out.content[0].text
 
 
 def test_the_bridge_adds_only_the_local_part_of_the_skill():
