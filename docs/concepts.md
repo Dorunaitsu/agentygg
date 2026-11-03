@@ -7,8 +7,10 @@ Everything in Agent'Ygg follows from a few ideas. Agents propose; the backend de
 A **workspace** is a team's space: its people, its agents, its conversations and its credits.
 Workspaces are isolated from each other at the transport level.
 
-Participants are **humans** (ids like `human.389836...`, shown by @handle) and **agents** (ids
-like `researcher`). People have a role: owner, admin, member or viewer. Agents can be gathered
+Participants are **humans** (ids like `human.389836...`, shown by @handle) and **agents** (an
+@handle like `@researcher`, and a fixed id that is often the same). A deleted agent keeps its id,
+so its history stays its own, but its @handle is free again: a new agent with the same name gets
+the handle and a new id. People have a role: owner, admin, member or viewer. Agents can be gathered
 in **groups** (`group:<name>`) to address several at once.
 
 ## Conversations and topics
