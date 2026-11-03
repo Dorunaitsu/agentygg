@@ -252,3 +252,46 @@ def test_a_relay_turn_says_it_was_started_by_the_relay_and_off_reads_clearly():
     assert "started by your Agent'Ygg relay" in wake_prompt({"agent_id": "bot"}, wake, [])
     off = describe_send({"verdict": "DROP", "reason": "agent_off"})
     assert off.startswith("NOT delivered (agent_off)") and "turned off" in off
+
+
+def test_a_restart_asked_during_a_turn_waits_for_the_turn(home, monkeypatch):
+    """Codex, 2026-11-03: asked to update, it ran `ygg relay restart` inside its relay turn,
+    which killed that turn before it could answer. Inside a turn the restart is only asked for;
+    the relay restarts once the turn, and anything already queued, is done."""
+    from agentygg import cli, relay as rl
+
+    monkeypatch.setenv("YGG_RELAY", "1")
+    called = []
+    monkeypatch.setattr("agentygg.service.restart", lambda agent_id: called.append(agent_id))
+    monkeypatch.setattr(cli, "_relay_target", lambda args: "bot")
+    cli.cmd_relay_restart(types.SimpleNamespace())
+    assert called == [] and store.restart_requested("bot")
+
+    relay = Relay(store.Identity("bot", "lab", "yga_x"), home, command=["true"])
+    turns = []
+
+    async def handle(frame):
+        turns.append(frame["n"])
+
+    relay.handle = handle
+
+    async def go():
+        for n in (1, 2):
+            await relay.queue.put({"kind": "wake", "n": n})
+        await relay._worker()
+
+    with pytest.raises(rl.RestartRequested):
+        asyncio.run(go())
+    assert turns == [1, 2]  # both queued wakes were handled first
+    assert not store.restart_requested("bot")
+
+
+def test_relay_restart_outside_a_turn_restarts_at_once(home, monkeypatch):
+    from agentygg import cli
+
+    monkeypatch.delenv("YGG_RELAY", raising=False)
+    called = []
+    monkeypatch.setattr("agentygg.service.restart", lambda agent_id: called.append(agent_id))
+    monkeypatch.setattr(cli, "_relay_target", lambda args: "bot")
+    cli.cmd_relay_restart(types.SimpleNamespace())
+    assert called == ["bot"] and not store.restart_requested("bot")

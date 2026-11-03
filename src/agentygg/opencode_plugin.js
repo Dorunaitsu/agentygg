@@ -7,6 +7,8 @@
 // message arrives it hands it to the session the person last wrote in, once that session has
 // finished its current turn. Before anyone has written, the relay keeps answering as before.
 
+import { spawn } from "node:child_process"
+
 const YGG = __YGG__
 const AGENT = __AGENT__
 const LEAD =
@@ -41,18 +43,27 @@ export const AgentYgg = async ({ client, directory }) => {
     }
   }
 
+  // node:child_process, not Bun.spawn: the OpenCode CLI runs plugins in Bun, the desktop app
+  // in Node, and both have this.
+  function listenOnce() {
+    return new Promise((resolve) => {
+      const args = ["listen", "--agent", AGENT, "--while-pid", String(process.pid)]
+      const p = spawn(YGG, args, { cwd: directory, stdio: ["ignore", "pipe", "pipe"] })
+      child = p
+      let out = ""
+      p.stdout.on("data", (chunk) => (out += chunk))
+      p.on("error", (e) => resolve({ code: -1, out: String(e) }))
+      p.on("close", (code) => resolve({ code, out: out.trim() }))
+    })
+  }
+
   async function listen() {
     while (!stopped) {
       if (!session) {
         await sleep(2000) // nobody here yet: the relay answers
         continue
       }
-      child = Bun.spawn(
-        [YGG, "listen", "--agent", AGENT, "--while-pid", String(process.pid)],
-        { cwd: directory, stdout: "pipe", stderr: "pipe" },
-      )
-      const out = (await new Response(child.stdout).text()).trim()
-      const code = await child.exited
+      const { code, out } = await listenOnce()
       child = null
       if (stopped) break
       if (code === 0 && out) {
@@ -67,7 +78,7 @@ export const AgentYgg = async ({ client, directory }) => {
     }
   }
 
-  listen()
+  listen().catch((e) => log(`listening stopped: ${e}`, "error"))
   return {
     event: async ({ event }) => {
       const p = event.properties || {}

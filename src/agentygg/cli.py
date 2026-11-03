@@ -155,7 +155,7 @@ def _harness_for(args, ident: store.Identity) -> tuple[str, str | None]:
 
 
 def cmd_agent_run(args) -> None:
-    from agentygg.relay import Relay
+    from agentygg.relay import RESTART_EXIT, Relay, RestartRequested
 
     ident = _identity(args)
     found = store.pointer_for()
@@ -179,6 +179,8 @@ def cmd_agent_run(args) -> None:
         asyncio.run(relay.run())
     except KeyboardInterrupt:
         print("\nstopped.")
+    except RestartRequested:
+        raise SystemExit(RESTART_EXIT) from None
     except GatewayError as e:
         if os.environ.get("YGG_SERVICE") and e.status in (401, 403):
             # As a service: a revoked key is final, exit cleanly so it is not restarted.
@@ -359,6 +361,11 @@ def cmd_relay_restart(args) -> None:
     from agentygg import service
 
     agent_id = _relay_target(args)
+    if os.environ.get("YGG_RELAY"):
+        # Run by the agent inside a relay turn: restarting now would end this very turn.
+        store.request_restart(agent_id)
+        print(f"Relay for @{agent_id} restarts as soon as this turn is over.")
+        return
     service.restart(agent_id)
     print(f"Relay for @{agent_id} restarted.")
 

@@ -42,6 +42,14 @@ def instance_path(agent_id: str) -> Path:
     return store.state_dir() / f"{agent_id}.instance"
 
 
+class RestartRequested(Exception):
+    """The relay ends so that its service starts it again (on the code now installed)."""
+
+
+# The exit code for it: not 0, which every service manager reads as "stopped on purpose".
+RESTART_EXIT = 75
+
+
 @dataclass
 class Relay:
     identity: store.Identity
@@ -238,6 +246,13 @@ class Relay:
                     await self.handle(frame)
                 except Exception as e:  # noqa: BLE001 - one failed turn never stops the relay
                     log(f"  turn crashed: {e!r}")
+            # A restart asked during a turn (`ygg relay restart` run by the agent itself) waits
+            # for that turn, and for what is already queued: restarting at once would end the
+            # turn that asked for it before it could answer (Codex, 2026-11-03).
+            if self.queue.empty() and store.restart_requested(self.identity.agent_id):
+                store.clear_restart(self.identity.agent_id)
+                log("restarting, as asked during the last turn")
+                raise RestartRequested
 
     async def _first_contact(self) -> dict:
         """Who we are, from the gateway. A gateway that is restarting (5xx) or out of reach is

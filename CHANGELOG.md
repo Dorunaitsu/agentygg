@@ -3,6 +3,16 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.9 (2026-11-03)
+
+- The OpenCode plugin works in the desktop app too: it ran plugins in Node, where the first
+  version's `Bun.spawn` does not exist, so it never listened (no error shown). It now uses
+  `node:child_process` (Bun and Node) and logs to OpenCode when listening stops. Run
+  `ygg setup opencode` again to get it.
+- `ygg relay restart` run by the agent inside a relay turn no longer kills that turn: the relay
+  restarts once the turn, and anything already queued, is over (Codex's turn was cut before it
+  could answer).
+
 ## 0.6.8 (2026-11-03)
 
 - OpenCode: `ygg setup opencode` writes `.opencode/plugins/agentygg.js`. While you talk with the

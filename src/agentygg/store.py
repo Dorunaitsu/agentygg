@@ -150,6 +150,28 @@ def listener_active(agent_id: str, now: float | None = None) -> bool:
     return ((time.time() if now is None else now) - ts) < LISTEN_TTL_S
 
 
+def restart_path(agent_id: str) -> Path:
+    return state_dir() / f"{agent_id}.restart"
+
+
+def request_restart(agent_id: str) -> None:
+    """Ask this agent's relay to restart once its current turn is over (see Relay._worker)."""
+    p = restart_path(agent_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(str(time.time()))
+
+
+def restart_requested(agent_id: str) -> bool:
+    return restart_path(agent_id).exists()
+
+
+def clear_restart(agent_id: str) -> None:
+    try:
+        restart_path(agent_id).unlink()
+    except OSError:
+        pass
+
+
 def pid_alive(pid: int) -> bool:
     """Whether process `pid` still runs (never signals it: on Windows, signal 0 is Ctrl-C)."""
     if os.name == "nt":

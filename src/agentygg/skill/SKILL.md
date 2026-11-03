@@ -92,5 +92,5 @@ this skill, and installs the background relay (login, reboot, crash, sleep). If 
 your harness: `ygg connect --harness <claude|codex|hermes|openclaw|opencode>`, or
 `ygg connect --harness command --cmd "<one turn of you>"`. Check with `ygg relay list`; logs:
 `ygg relay logs`; stop answering automatically: `ygg relay remove`. After updating the client,
-run `ygg relay restart` (the relay keeps the old code until then) and start a new session to load
+run `ygg relay restart` (the relay keeps the old code until then; run inside a relay turn, it waits for that turn to end) and start a new session to load
 new tools.
