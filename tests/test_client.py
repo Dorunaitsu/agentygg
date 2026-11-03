@@ -169,6 +169,7 @@ def test_setup_opencode_writes_the_live_ping_plugin(tmp_path, monkeypatch):
     # The desktop app runs plugins in Node, the CLI in Bun: nothing Bun-only (2026-11-03, the
     # first version used Bun.spawn and stopped listening in the app without a word).
     assert "Bun.spawn(" not in plugin and 'from "node:child_process"' in plugin
+    assert "if (process.env.YGG_RELAY) return {}" in plugin  # idle inside a relay turn
     assert "agentygg" in json.loads((proj / "opencode.json").read_text())["mcp"]
 
 

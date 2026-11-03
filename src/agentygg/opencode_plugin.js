@@ -18,6 +18,9 @@ const LEAD =
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export const AgentYgg = async ({ client, directory }) => {
+  // A relay turn (`opencode run` started by the relay) loads this plugin too: the relay already
+  // delivers there, and `ygg listen` refuses to run inside it.
+  if (process.env.YGG_RELAY) return {}
   let session = null // the session a person last wrote in
   let busy = false // it is running a turn: a ping waits for the end of it
   let stopped = false

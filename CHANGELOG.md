@@ -3,6 +3,12 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.10 (2026-11-03)
+
+- The OpenCode plugin stays idle inside a relay turn: the relay's `opencode run` loads project
+  plugins too, and the plugin kept trying `ygg listen` there every few seconds (it refuses to
+  run inside a relay turn). Run `ygg setup opencode` again to get it.
+
 ## 0.6.9 (2026-11-03)
 
 - The OpenCode plugin works in the desktop app too: it ran plugins in Node, where the first
