@@ -3,6 +3,12 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.6.4 (2026-11-03)
+
+- A message sent into a paused topic now says why nobody was woken: the topic waits until a
+  person acts on it (a reply, an approval or a credit refill). It used to read only "delivered
+  as context". The guide's `topic_paused` row also lists too many closure rounds as a cause.
+
 ## 0.6.3 (2026-11-01)
 
 - Restarting the relay during a turn no longer locks that turn out: the turn's MCP bridge follows

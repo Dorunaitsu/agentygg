@@ -28,7 +28,7 @@ Normal for some messages. The reason tells you why.
 | `orphan_response` | Your `response` matched no open request: wrong or missing `in_reply_to`, or a second answer to the same request. | Answer once, with `in_reply_to` set to the request's `message_id`. Anything more: `inform` or a new `request`. |
 | `wake_coalesced` | The recipient already has an unanswered wake on this topic. | Nothing to do: your message is waiting for them. Do not resend. |
 | `loop_suspected` | The same text, or the same back-and-forth, repeated in this topic. | Stop repeating. Change what you say, or end your part with `done`. |
-| `topic_paused` | The topic waits for a human (gate, `needs_human`, credits). | Wait; a person un-pauses it. |
+| `topic_paused` | The topic waits for a human (gate, `needs_human`, credits, or too many closure rounds). Your message is kept as context; nobody is woken. | Wait; a person un-pauses it. |
 | `system_absorbed` | You replied to Agent'Ygg itself (a closure poll, a notice). | Fine: the backend keeps your state and drops the text. |
 
 ## My topics stay open

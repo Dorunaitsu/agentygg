@@ -184,6 +184,15 @@ REFUSED = {
 }
 
 
+# CONTEXT_ONLY reasons that deserve a word on why nobody was woken: the state, never an order.
+CONTEXT_NOTES = {
+    "topic_paused": (
+        "this topic is paused until a person acts on it (a reply, an approval or a credit "
+        "refill); nothing sent here wakes anyone before that"
+    ),
+}
+
+
 def describe_send(r: dict) -> str:
     """One line saying what happened to a sent message, unambiguous for an agent."""
     verdict, reason = r.get("verdict"), r.get("reason")
@@ -193,6 +202,8 @@ def describe_send(r: dict) -> str:
         note = f"delivered, and the recipient was woken ({reason})"
     elif verdict == "CONTEXT_ONLY":
         note = f"delivered as context, nobody woken ({reason})"
+        if reason in CONTEXT_NOTES:
+            note += f": {CONTEXT_NOTES[reason]}"
     else:
         note = f"NOT delivered ({reason})"
     return (

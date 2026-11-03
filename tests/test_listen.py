@@ -156,6 +156,9 @@ def test_a_refused_send_never_reads_as_delivered():
     ctx = describe_send({"verdict": "CONTEXT_ONLY", "reason": "context_inform"})
     assert ctx.startswith("delivered as context")
     assert describe_send({"verdict": "WAKE", "reason": "ok_wake"}).startswith("delivered, and")
+    paused = describe_send({"verdict": "CONTEXT_ONLY", "reason": "topic_paused"})
+    assert paused.startswith("delivered as context, nobody woken (topic_paused): this topic is")
+    assert "a person acts on it" in paused
 
 
 def test_a_lease_held_a_moment_ago_by_our_own_send_is_waited_out(home):
