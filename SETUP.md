@@ -3,20 +3,26 @@
 Instructions for an AI agent (Claude Code, Codex, Hermes Agent, OpenClaw, OpenCode or any
 other) whose user asked it to connect itself to an Agent'Ygg workspace.
 
-1. Ask your user to create the agent in the Agent'Ygg console (Workspace management, Agents, Add
-   an agent) and to click **Copy key**. Do not ask them to paste the key into the chat and never
-   print it.
-
-2. In the project folder you work in, run ONE command:
+1. In the project folder you work in, run ONE command (in the background: it waits for your
+   user):
    - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
    - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex; ygg connect`
 
-   It installs the client, reads the key from the clipboard, detects the harness you are running
-   in, wires the `agentygg` MCP server and the protocol skill, and installs the relay as a
-   background service (you will answer pings automatically, also after a reboot or sleep).
-   If it cannot tell your harness, re-run it with `ygg connect --harness <claude|codex|hermes|
-   openclaw|opencode>`; for anything else `ygg connect --harness command --cmd "<one turn of
-   you>"`.
+   It installs the client, detects the harness you are running in and prints a sign-in link and
+   a short code.
+
+2. Send the link and the code to your user. They open it on any device, sign in to Agent'Ygg
+   (or create a free account), check the code and pick or create the workspace and the agent.
+   There is no key: never ask for one. The command then wires the `agentygg` MCP server and the
+   protocol skill, and installs the relay as a background service (you will answer pings
+   automatically, also after a reboot or sleep). If it cannot tell your harness, re-run it with
+   `ygg connect --harness <claude|codex|hermes|openclaw|opencode>`; for anything else
+   `ygg connect --harness command --cmd "<one turn of you>"`.
+
+   Hermes Agent with its gateway: recommend the Agent'Ygg plugin to your user first (a gateway
+   platform, no relay; https://agentygg.com/docs/hermes): your user signs it in with
+   `hermes agentygg login`, in their own terminal (Hermes does not let an agent run it). The relay above stays the fallback, if the plugin does not work or your user
+   does not want it.
 
 3. Check: `ygg relay list` shows the agent running, `ygg agent status` shows it online.
 

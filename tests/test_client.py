@@ -222,9 +222,19 @@ def test_mcp_bridge_says_when_the_server_is_out_of_reach(tmp_path, monkeypatch, 
 
     monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(mcp_server, "CONNECT_TRIES", (0,))
-    key = "yga_" + base64.urlsafe_b64encode(b'{"w":"ws","a":"bot","s":"x"}').decode().rstrip("=")
-    monkeypatch.setenv("YGG_AGENT_KEY", key)
-    monkeypatch.setenv("YGG_API", "http://127.0.0.1:9")  # nothing listens there
+    import time
+
+    store.save(  # a signed-in agent, on an API where nothing listens
+        store.Identity(
+            "bot",
+            "ws",
+            api="http://127.0.0.1:9",
+            client_id="ygd_x",
+            access_token="ygo_x",
+            refresh_token="ygr_x",
+            expires_at=time.time() + 3600,
+        )
+    )
     assert store.resolve(None).agent_id == "bot"
     with pytest.raises(SystemExit) as e:
         mcp_server.run(None)
@@ -360,3 +370,207 @@ def test_a_turn_follows_its_relay_when_the_relay_restarts(monkeypatch):
     monkeypatch.setattr(mcp_server, "_relay_nonce", lambda agent_id: None)
     mcp_server.follow_relay(gw, http)
     assert gw.nonce == "new-relay"
+
+
+# -- sign-in only (Ray, 2026-11-08) ------------------------------------------ #
+
+
+class _FakeApi:
+    """Answers like the Agent'Ygg API: the device login, /v1/agent/me and the refresh."""
+
+    def __init__(self):
+        self.refreshes = 0
+        self.pending = 1
+
+    def __call__(self, req):
+        import httpx
+
+        path = req.url.path
+        form = dict(httpx.QueryParams(req.content.decode())) if req.content else {}
+        if path == "/v1/oauth/device":
+            assert form["client_name"].startswith("Codex on ")
+            return httpx.Response(
+                200,
+                json={
+                    "device_code": "dc",
+                    "user_code": "KQZD-MXPT",
+                    "verification_uri": "https://agentygg.com/device",
+                    "verification_uri_complete": "https://agentygg.com/device?code=KQZD-MXPT",
+                    "expires_in": 600,
+                    "interval": 5,
+                    "client_id": "ygd_1",
+                },
+            )
+        if path == "/v1/oauth/device/token":
+            if self.pending:
+                self.pending -= 1
+                return httpx.Response(400, json={"error": "authorization_pending"})
+            return httpx.Response(
+                200, json={"access_token": "ygo_0", "refresh_token": "ygr_0", "expires_in": 3600}
+            )
+        if path == "/v1/agent/me":
+            assert req.headers["authorization"].startswith("Bearer ygo_")
+            return httpx.Response(
+                200,
+                json={
+                    "agent_id": "codex",
+                    "handle": "@codex",
+                    "workspace_id": "ws1",
+                    "display_name": "Codex",
+                    "workspace_name": "Lab",
+                },
+            )
+        if path == "/token":
+            if form["refresh_token"] != f"ygr_{self.refreshes}":
+                return httpx.Response(400, json={"error": "invalid_grant"})
+            self.refreshes += 1
+            n = self.refreshes
+            return httpx.Response(
+                200,
+                json={"access_token": f"ygo_{n}", "refresh_token": f"ygr_{n}", "expires_in": 3600},
+            )
+        return httpx.Response(404)
+
+
+def test_connecting_signs_in_with_a_link_and_keeps_no_key(tmp_path, monkeypatch, capsys):
+    import httpx
+
+    from agentygg import cli, login, store
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.chdir(tmp_path)
+    api = _FakeApi()
+    real = login.device_login
+
+    def fake_login(url, client_name="", **kw):
+        return real(
+            url,
+            client_name=client_name,
+            http=httpx.Client(transport=httpx.MockTransport(api)),
+            sleep=lambda s: None,
+        )
+
+    monkeypatch.setattr(login, "device_login", fake_login)
+    ident = cli._sign_in("https://api.test", tmp_path, "Codex")
+    out = capsys.readouterr().out
+    assert "https://agentygg.com/device?code=KQZD-MXPT" in out and "@codex" in out
+    assert "@@" not in out
+    saved = store.load("codex")
+    assert saved.key == "" and saved.refresh_token == "ygr_0" and saved.workspace_id == "ws1"
+    assert store.pointer_for(tmp_path)[0] == "codex"
+    path = tmp_path / "home" / "agents" / "codex.json"
+    if os.name != "nt":  # Windows has no POSIX modes: the user profile's ACL protects ~/.ygg
+        assert oct(path.stat().st_mode & 0o777) == "0o600"
+    assert ident.workspace_name == "Lab"
+
+
+def test_the_token_is_refreshed_once_and_kept(tmp_path, monkeypatch):
+    import threading
+
+    import httpx
+
+    from agentygg import store
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    api = _FakeApi()
+    ident = store.Identity(
+        "codex",
+        "ws1",
+        api="https://api.test",
+        client_id="ygd_1",
+        access_token="ygo_0",
+        refresh_token="ygr_0",
+        expires_at=1000.0,
+    )
+    store.save(ident)
+    http = httpx.Client(transport=httpx.MockTransport(api))
+    assert store.bearer(ident, now=lambda: 0.0, http=http) == "ygo_0"  # still fresh
+    got = []
+    # the relay and several turns' bridges, on stale copies of the same identity
+    copies = [store.load("codex") for _ in range(6)]
+    threads = [
+        threading.Thread(
+            target=lambda c=c: got.append(store.bearer(c, now=lambda: 990.0, http=http))
+        )
+        for c in copies
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert set(got) == {"ygo_1"} and api.refreshes == 1
+    assert store.load("codex").refresh_token == "ygr_1"
+
+
+def test_an_ended_sign_in_says_to_connect_again(tmp_path, monkeypatch):
+    import httpx
+
+    from agentygg import login, store
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    ident = store.Identity(
+        "codex",
+        "ws1",
+        api="https://api.test",
+        client_id="c",
+        access_token="a",
+        refresh_token="ygr_unknown",
+        expires_at=0.0,
+    )
+    store.save(ident)
+    http = httpx.Client(transport=httpx.MockTransport(_FakeApi()))
+    with pytest.raises(login.LoginNeeded, match="ygg connect"):
+        store.bearer(ident, now=lambda: 10.0, http=http)
+
+
+def test_no_command_takes_a_key_any_more(capsys):
+    from agentygg import cli
+
+    with pytest.raises(SystemExit):
+        cli.main(["agent", "add", "yga_whatever"])
+    assert "ygg connect" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main(["connect", "--key", "yga_whatever"])
+
+
+def test_an_identity_from_before_0_7_still_uses_its_key():
+    from agentygg import store
+
+    assert store.bearer(store.Identity("old", "ws", "yga_legacy")) == "yga_legacy"
+
+
+def test_the_sign_in_link_is_printed_at_once(monkeypatch):
+    """2026-11-08: run in the background (stdout a pipe), `ygg login` showed nothing while it
+    waited, so an agent could not hand its person the link."""
+    import io
+
+    from agentygg import login
+
+    class Pipe(io.StringIO):
+        flushed = 0
+
+        def flush(self):
+            Pipe.flushed += 1
+
+    pipe = Pipe()
+    monkeypatch.setattr("sys.stdout", pipe)
+    login._say("https://agentygg.com/device?code=KQZD-MXPT")
+    assert "KQZD-MXPT" in pipe.getvalue() and Pipe.flushed >= 1
+
+
+def test_the_device_is_named_by_its_harness_and_short_machine_name(monkeypatch):
+    """Ray, 2026-11-08: "An agent on ray.local" says too little and too much."""
+    from agentygg import login
+
+    monkeypatch.setattr(login.socket, "gethostname", lambda: "ray.local")
+    assert login.device_name("Claude Code") == "Claude Code on ray"
+    monkeypatch.setattr(login.socket, "gethostname", lambda: "mini.home.lan")
+    assert login.device_name() == "An agent on mini"
+
+
+def test_the_link_comes_with_a_qr_code_to_scan():
+    from agentygg import login
+
+    lines = login.qr_lines("https://agentygg.com/device?code=LQCJ-FBRZ")
+    assert len(lines) > 10 and len({len(line) for line in lines}) == 1  # a square block
+    assert set("".join(lines)) <= {" ", "█", "▀", "▄"}

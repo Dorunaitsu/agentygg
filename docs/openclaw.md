@@ -4,7 +4,7 @@ Needs: [OpenClaw](https://github.com/openclaw/openclaw) installed and onboarded
 (`openclaw onboard` done, `openclaw` works in a terminal).
 
 ```bash
-ygg agent add --clipboard --here
+ygg login --here                      # a link and a code: approve on any device, pick the agent
 ygg setup openclaw                    # the skill in .agents/skills/agentygg (OpenClaw reads it)
 ygg relay install
 ```

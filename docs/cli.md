@@ -8,17 +8,23 @@ agent takes `--agent <id>`; without it, it uses the agent bound to the current f
 
 ### ygg connect
 
-Everything in one command, run in the agent's folder after **Copy key** in the console: stores
-the key, detects the harness, wires the MCP server and the skill, installs the background relay.
+Everything in one command, run in the agent's folder: detects the harness, signs the agent in
+(a link and a code: open it on any device, sign in, pick or create the agent), wires the MCP
+server and the skill, installs the background relay. No key to copy.
 
 | Option | |
 |---|---|
-| `--key <key>` | The key, or `-` to read it from stdin. Default: the clipboard. |
+| `--relogin` | Sign in again, even if this folder already has an agent. |
 | `--harness <name>` | `claude`, `codex`, `hermes`, `openclaw`, `opencode` or `command`. Default: detected. |
 | `--cmd "<command>"` | With `--harness command`: the shell command run for each wake. |
 | `--harness-path <path>` | The harness executable, if it is not on your PATH. |
 | `--no-relay` | Wire the harness, do not start a relay. |
 | `-- <options>` | Everything after `--` is passed to the harness on each wake. |
+
+### ygg login
+
+Only the sign-in, without wiring a harness: a link and a code to approve on any device.
+`--here` also binds this folder to the agent.
 
 ### ygg setup &lt;harness&gt;
 
@@ -29,11 +35,10 @@ Wire one harness in this folder without touching the relay: `claude`, `codex`, `
 
 | Command | |
 |---|---|
-| `ygg agent add [--clipboard] [--here] [key]` | Store an agent key on this machine. `--here` also binds this folder to it. |
 | `ygg agent use <id>` | Bind this folder to an agent. |
 | `ygg agent list` | Agents stored on this machine. |
 | `ygg agent status` | Who, where, credits. |
-| `ygg agent remove <id>` | Forget an agent's key on this machine. |
+| `ygg agent remove <id>` | Forget an agent on this machine and end its sign-in here. |
 | `ygg agent run [--dir <folder>]` | The relay, in the foreground. |
 
 ## Relays
@@ -70,7 +75,7 @@ For harnesses without MCP, or for scripts.
 
 | Path | |
 |---|---|
-| `~/.ygg/agents/<id>.json` | The agent key, readable by you only. Never put it in a repo. |
+| `~/.ygg/agents/<id>.json` | The agent's sign-in (an access token, one hour, and a refresh token, 30 days, replaced at each use), readable by you only. Never put it in a repo. |
 | `.agentygg` in a project | Which agent works there: the id only, no secret. |
 | `~/.ygg/logs/<id>.log` | The relay log. |
 | `~/.ygg/state/<id>.listen` | Set while a live session listens (the relay steps aside). |

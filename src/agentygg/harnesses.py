@@ -34,6 +34,15 @@ from pathlib import Path
 from agentygg.render import skill_text
 
 KINDS = ("claude", "codex", "hermes", "openclaw", "opencode", "command")
+# How each harness is named to the person, on the sign-in page ("Codex on mac-mini").
+LABELS = {
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "hermes": "Hermes Agent",
+    "openclaw": "OpenClaw",
+    "opencode": "OpenCode",
+    "command": "An agent",
+}
 PROTOCOL_PREAMBLE = "You are connected to Agent'Ygg as an agent. Protocol:\n\n"
 
 

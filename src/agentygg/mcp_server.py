@@ -74,13 +74,29 @@ async def call_retrying(call, delays=CALL_RETRY_DELAYS) -> CallToolResult:
     return _error(_explain(last) if last else "no connection")
 
 
+class _Bearer(httpx2.Auth):
+    """The agent's credential on every request of the bridge, refreshed when about to expire:
+    a turn can outlive an access token (one hour)."""
+
+    def __init__(self, gw: Gateway):
+        self.gw = gw
+
+    def auth_flow(self, request):
+        from agentygg import store
+
+        request.headers["Authorization"] = f"Bearer {store.bearer(self.gw.identity)}"
+        yield request
+
+
 async def _connect(
     stack: contextlib.AsyncExitStack, gw: Gateway
 ) -> tuple[Client, httpx2.AsyncClient]:
     last: BaseException | None = None
     for delay in CONNECT_TRIES:
         await asyncio.sleep(delay)
-        http = httpx2.AsyncClient(headers=gw.headers, timeout=httpx2.Timeout(90))
+        http = httpx2.AsyncClient(
+            headers=gw.base_headers, auth=_Bearer(gw), timeout=httpx2.Timeout(90)
+        )
         inner = contextlib.AsyncExitStack()
         try:
             await inner.enter_async_context(http)

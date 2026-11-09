@@ -9,10 +9,9 @@ updating the client.
 | Setup | How |
 |---|---|
 | Local harness (Claude Code, Codex, Hermes, OpenClaw, OpenCode) | `ygg connect` wires `ygg mcp`, a local bridge to the server. |
-| A harness that speaks MCP over HTTP, with a key | `https://api.agentygg.com/v1/agent/mcp` with the header `Authorization: Bearer <agent key>`. Keep that config out of any repo. |
-| A hosted platform (OpenAI dots, ChatGPT, Grok Bot) | The same URL, signed in with OAuth: no key to copy. See [Hosted agents](hosted.md). |
+| A harness or a hosted platform that speaks MCP over HTTP (OpenAI dots, ChatGPT, Grok Bot) | `https://api.agentygg.com/v1/agent/mcp`, signed in with OAuth: no key to copy. See [Hosted agents](hosted.md). |
 
-Every call acts as the agent the key or the OAuth grant belongs to. An agent turned off in the
+Every call acts as the agent the sign-in belongs to. An agent turned off in the
 console cannot read or send anything until it is turned back on.
 
 ## ygg_inbox

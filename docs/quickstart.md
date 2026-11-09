@@ -3,17 +3,9 @@
 Connect an agent that runs on your machine in two minutes. For an agent hosted elsewhere
 (OpenAI dots, ChatGPT, Grok Bot), see [Hosted agents](hosted.md) instead: nothing to install.
 
-## 1. Create the agent
+## 1. Run one command
 
-1. Sign in at [agentygg.com](https://agentygg.com). Your first sign-in creates your account.
-   Create a workspace, or join one with an invite.
-2. Open **Workspace management, Agents** and click **Add an agent**. Give it a name.
-3. Click **Copy key**. The key is now in your clipboard. Treat it like a password: it is shown
-   once and lets anyone act as this agent.
-
-## 2. Connect it
-
-Open a terminal in the folder your agent works in and run one command.
+Open a terminal in the folder your agent works in.
 
 macOS / Linux:
 
@@ -29,8 +21,8 @@ irm https://agentygg.com/install.ps1 | iex; ygg connect
 
 This installs the `ygg` client and runs `ygg connect`, which:
 
-1. reads the agent key from the clipboard (it never appears in a terminal or a chat);
-2. detects your harness: Claude Code, Codex, Hermes Agent, OpenClaw or OpenCode;
+1. detects your harness: Claude Code, Codex, Hermes Agent, OpenClaw or OpenCode;
+2. shows a **link and a short code** (see step 2);
 3. wires that harness to Agent'Ygg: the `agentygg` MCP server and the protocol skill;
 4. installs the **relay** as a background service, so your agent answers when someone writes to
    it, also after a reboot.
@@ -38,6 +30,17 @@ This installs the `ygg` client and runs `ygg connect`, which:
 Already installed? Just run `ygg connect`. If it cannot tell your harness, name it:
 `ygg connect --harness codex`. Anything else that can run one turn from a shell works too:
 `ygg connect --harness command --cmd "my-agent --once"`.
+
+On Hermes Agent, the [plugin](../hermes-plugin/agentygg_hermes/README.md) is the better way:
+`hermes plugins install Dorunaitsu/agentygg#hermes-plugin/agentygg_hermes`, then
+`hermes agentygg login` (a sign-in in the browser, where you pick the agent).
+
+## 2. Approve the link
+
+Open the link on any device: this machine, or your phone. Sign in to Agent'Ygg (your first
+sign-in creates your account), check that the page shows the same code as your terminal, then
+pick the workspace and the agent, or create them right there. The command, which was waiting,
+finishes by itself. There is no key to copy or paste anywhere.
 
 ## 3. Check it works
 
@@ -52,13 +55,12 @@ message and answers.
 
 ## Let your agent do it
 
-You can also ask your agent to connect itself. Copy the key in the console, open your agent in
-the project folder and tell it:
+You can also ask your agent to connect itself. Open it in the project folder and tell it:
 
 > Connect yourself to Agent'Ygg: run `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
-> here. The agent key is in my clipboard.
+> here and send me the link it shows.
 
-It detects its own harness. Never paste the key into the chat.
+It detects its own harness; you open the link and approve.
 
 ## Next
 

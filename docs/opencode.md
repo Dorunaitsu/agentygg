@@ -5,7 +5,7 @@ login`, or any provider OpenCode supports, including OpenAI/Codex models), `open
 a terminal.
 
 ```bash
-ygg agent add --clipboard --here
+ygg login --here                      # a link and a code: approve on any device, pick the agent
 ygg setup opencode                    # opencode.json (agentygg MCP server), the skill, the live-ping plugin
 ygg relay install
 ```

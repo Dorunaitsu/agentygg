@@ -3,7 +3,7 @@
 Needs: [Claude Code](https://claude.com/claude-code) installed and signed in (`claude` works in a terminal).
 
 ```bash
-ygg agent add --clipboard --here      # in the project folder, after "Copy key" in the console
+ygg login --here                      # in the project folder: a link to approve on any device
 ygg setup claude                      # .mcp.json + .claude/skills/agentygg + .agents/skills/agentygg
 ygg relay install                     # answers pings in the background
 ```

@@ -74,6 +74,20 @@ UNREACHED = (502, 503, 504)
 RETRY_DELAYS = (2, 5, 10, 15)
 
 
+class _Bearer(httpx.Auth):
+    """The agent's credential on every request, refreshed first when it is about to expire
+    (store.bearer), so a long-lived client (the relay, a turn's MCP bridge) never goes stale."""
+
+    def __init__(self, identity: Identity):
+        self.identity = identity
+
+    def auth_flow(self, request):
+        from agentygg import store
+
+        request.headers["Authorization"] = f"Bearer {store.bearer(self.identity)}"
+        yield request
+
+
 class Gateway:
     """One live instance of an agent. `nonce` identifies this instance to the backend's lease;
     processes that act as the same instance (the relay and the MCP server it launches) share
@@ -89,15 +103,22 @@ class Gateway:
         )
         self.nonce = self.nonce or secrets.token_hex(8)
         self.base = identity.api.rstrip("/")
-        self._http = httpx.AsyncClient(base_url=self.base, headers=self.headers, timeout=60)
+        self.auth = _Bearer(identity)
+        self._http = httpx.AsyncClient(
+            base_url=self.base, headers=self.base_headers, auth=self.auth, timeout=60
+        )
+
+    @property
+    def base_headers(self) -> dict[str, str]:
+        """Everything but the credential (added per request by `self.auth`)."""
+        return {"X-Ygg-Instance": self.nonce, "User-Agent": f"agentygg/{__version__}"}
 
     @property
     def headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.identity.key}",
-            "X-Ygg-Instance": self.nonce,
-            "User-Agent": f"agentygg/{__version__}",
-        }
+        """With the credential, for a one-off connection (the wake stream)."""
+        from agentygg import store
+
+        return {**self.base_headers, "Authorization": f"Bearer {store.bearer(self.identity)}"}
 
     async def close(self) -> None:
         await self._http.aclose()
@@ -105,9 +126,13 @@ class Gateway:
     async def _call(self, method: str, path: str, **kw) -> Any:
         # A deploy takes the gateway away for some seconds: a call that cannot have reached it
         # (no connection, or the proxy answering that nothing is behind it) is made again.
+        from agentygg.login import LoginNeeded
+
         for delay in (*RETRY_DELAYS, None):
             try:
                 r = await self._http.request(method, path, **kw)
+            except LoginNeeded as e:
+                raise GatewayError(401, str(e)) from e
             except httpx.ConnectError:
                 if delay is None:
                     raise
@@ -168,11 +193,17 @@ class Gateway:
         from websockets.asyncio.client import connect
         from websockets.exceptions import ConnectionClosed, InvalidStatus
 
+        from agentygg.login import LoginNeeded
+
         url = self.base.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
+        try:
+            headers = await asyncio.to_thread(lambda: self.headers)
+        except LoginNeeded as e:
+            raise GatewayError(401, str(e)) from e
         try:
             async with connect(
                 f"{url}/v1/agent/stream",
-                additional_headers=self.headers,
+                additional_headers=headers,
                 open_timeout=30,
                 ping_interval=20,
                 max_size=8 * 1024 * 1024,
@@ -233,7 +264,7 @@ def describe_send(r: dict) -> str:
 
 def _close_reason(status: int) -> str:
     return {
-        401: "this agent key is not valid (revoked, or the agent was deleted)",
+        401: "this agent's sign-in is not valid (revoked, or the agent was deleted): run `ygg connect` again",
         403: "this agent is revoked, or its workspace is suspended",
         409: "identity_busy: another instance of this agent is already connected",
         400: "bad request",

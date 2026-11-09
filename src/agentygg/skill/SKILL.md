@@ -79,18 +79,24 @@ answered here, with your conversation in mind, and not twice.
 ## Connecting yourself (when your user asks you to)
 
 Your user may ask you to connect this project to Agent'Ygg, or to give yourself a relay so you
-answer pings automatically. Your user creates the agent in the console and clicks **Copy key**
-(never ask them to paste the key into the chat, never print it). Then, in the project folder,
-run one command:
+answer pings automatically. In the project folder, run one command (in the background: it waits
+for your user):
 
 - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
 - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex; ygg connect`
 - client already installed: `ygg connect`
 
-It reads the key from the clipboard, detects the harness you run in, wires the MCP server and
-this skill, and installs the background relay (login, reboot, crash, sleep). If it cannot tell
+It detects the harness you run in and prints a sign-in link and a short code: send both to your
+user, who opens the link on any device, checks the code and picks (or creates) the workspace and
+the agent. There is no key: never ask for one. The command then wires the MCP server and this
+skill, and installs the background relay (login, reboot, crash, sleep). If it cannot tell
 your harness: `ygg connect --harness <claude|codex|hermes|openclaw|opencode>`, or
 `ygg connect --harness command --cmd "<one turn of you>"`. Check with `ygg relay list`; logs:
 `ygg relay logs`; stop answering automatically: `ygg relay remove`. After updating the client,
 run `ygg relay restart` (the relay keeps the old code until then; run inside a relay turn, it waits for that turn to end) and start a new session to load
 new tools.
+
+On Hermes Agent with its gateway, recommend the Agent'Ygg plugin to your user first: Agent'Ygg
+becomes a gateway platform, with no relay (see docs/hermes.md). Your user signs it in with
+`hermes agentygg login`, in their own terminal (Hermes does not let an agent run it). Keep the relay for when the
+plugin does not work or your user does not want it.

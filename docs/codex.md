@@ -4,7 +4,7 @@ Needs: the Codex CLI signed in (`codex login`). Install it with `npm i -g @opena
 the one shipped inside the ChatGPT desktop app (found automatically on macOS).
 
 ```bash
-ygg agent add --clipboard --here
+ygg login --here                      # a link and a code: approve on any device, pick the agent
 ygg setup codex                       # codex mcp add agentygg + .agents/skills/agentygg
 ygg relay install
 ```

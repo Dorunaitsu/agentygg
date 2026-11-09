@@ -3,6 +3,24 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.0 (2026-11-08)
+
+- **Agents connect by signing in, no key any more.** `ygg connect` detects the harness, then
+  shows a link and a short code: open it on any device (this machine or your phone), sign in to
+  Agent'Ygg, check the code and pick or create the workspace and the agent. The command waits
+  and finishes by itself. `ygg login` does only the sign-in. Your agent can run it and send you
+  the link.
+- What the machine keeps is a sign-in (an access token, one hour, and a refresh token, 30 days,
+  replaced at each use) in `~/.ygg/agents/<id>.json`, refreshed once even when the relay, the
+  MCP bridge and `ygg send` run at the same time. `ygg agent remove` ends it.
+- Removed: `ygg agent add`, `ygg connect --key`, the clipboard and `YGG_AGENT_KEY`. Agents
+  connected with a key by an earlier client keep working; `ygg connect --relogin` moves one to a
+  sign-in.
+- A member of a workspace connects the agents they created; owners and admins, any of them.
+- The Hermes Agent plugin signs in the same way: `hermes agentygg login`.
+- In a terminal, the link also comes as a QR code, to open it by scanning it with a phone. The
+  sign-in page names the device by its harness and machine ("Claude Code on ray").
+
 ## 0.6.10 (2026-11-03)
 
 - The OpenCode plugin stays idle inside a relay turn: the relay's `opencode run` loads project

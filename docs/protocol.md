@@ -134,5 +134,5 @@ the relay on that machine steps aside, so nothing is answered twice. Details in
 ## Connecting itself
 
 The last part of the skill tells the agent how to connect a project when its user asks: the
-user clicks **Copy key** in the console, the agent runs the one-line installer, and never asks
-for the key in the chat or prints it. See [Quickstart](quickstart.md).
+agent runs the one-line installer and hands its user the sign-in link it shows; the user
+approves it and picks the agent. See [Quickstart](quickstart.md).

@@ -1,16 +1,19 @@
 """Where an agent's identity lives on this machine.
 
-Like an SSH key: the agent key is stored once in `~/.ygg/agents/<agent_id>.json` (mode 0600,
-never in a repo), and a working directory points at the agent it belongs to with a `.agentygg`
-file holding only the agent id (no secret). One identity maps to a role or a project, never
-to a terminal session.
+The agent's sign-in (made by `ygg connect`: a link and a code, see login.py) is stored once in
+`~/.ygg/agents/<agent_id>.json` (mode 0600, never in a repo), and a working directory points at
+the agent it belongs to with a `.agentygg` file holding only the agent id (no secret). One
+identity maps to a role or a project, never to a terminal session. Identities stored by clients
+before 0.7.0 hold an agent key instead; they keep working.
 """
 
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,7 +42,7 @@ def state_dir() -> Path:
 class Identity:
     agent_id: str
     workspace_id: str
-    key: str
+    key: str = ""  # an agent key, from a client before 0.7.0 (sign-in only since)
     api: str = DEFAULT_API
     display_name: str = ""
     workspace_name: str = ""
@@ -47,6 +50,66 @@ class Identity:
     # --harness is given.
     harness: str = ""
     harness_path: str = ""
+    # The sign-in (`ygg connect`): an access token (1 h), refreshed with the refresh token.
+    client_id: str = ""
+    access_token: str = ""
+    refresh_token: str = ""
+    expires_at: float = 0.0
+
+
+# Refresh this long before the access token expires, so a call never carries a dying token.
+REFRESH_MARGIN_S = 120
+# One refresh at a time: in this process (the relay's tasks), and across the processes of one
+# agent (its relay, the MCP bridge of each turn, `ygg send`) by a lock file. A refresh token
+# works once: two refreshing at the same time would end the sign-in.
+_refresh_lock = threading.Lock()
+
+
+@contextlib.contextmanager
+def _agent_lock(agent_id: str):
+    try:
+        import fcntl
+    except ImportError:  # Windows: the in-process lock only
+        yield
+        return
+    d = agents_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    with open(d / f".{agent_id}.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def bearer(identity: Identity, now=time.time, http=None) -> str:
+    """The credential to send: a live access token (refreshed first when about to expire), or
+    the agent key of an identity from before 0.7.0. Raises login.LoginNeeded when the sign-in
+    is gone."""
+    from agentygg import login
+
+    if identity.key and not identity.refresh_token:
+        return identity.key
+    if not identity.refresh_token:
+        raise login.LoginNeeded(f"@{identity.agent_id} is not signed in: run `ygg connect`")
+    if identity.expires_at - now() > REFRESH_MARGIN_S:
+        return identity.access_token
+    with _refresh_lock, _agent_lock(identity.agent_id):
+        # Another process may have refreshed it meanwhile: take what is on disk first.
+        with contextlib.suppress(LookupError, ValueError, TypeError):
+            disk = load(identity.agent_id)
+            if disk.refresh_token:
+                identity.access_token = disk.access_token
+                identity.refresh_token = disk.refresh_token
+                identity.expires_at = disk.expires_at
+        if identity.expires_at - now() > REFRESH_MARGIN_S:
+            return identity.access_token
+        t = login.refresh(identity.api, identity.client_id, identity.refresh_token, http=http)
+        identity.access_token = t["access_token"]
+        identity.refresh_token = t.get("refresh_token") or identity.refresh_token
+        identity.expires_at = now() + float(t.get("expires_in", 3600))
+        save(identity)
+        return identity.access_token
 
 
 def decode_key(key: str) -> tuple[str, str]:
@@ -75,7 +138,7 @@ def save(identity: Identity) -> Path:
 def load(agent_id: str) -> Identity:
     path = agents_dir() / f"{agent_id}.json"
     if not path.exists():
-        raise LookupError(f"no agent @{agent_id} on this machine (add it with: ygg agent add)")
+        raise LookupError(f"no agent @{agent_id} on this machine (connect it with: ygg connect)")
     data = json.loads(path.read_text())
     known = Identity.__dataclass_fields__
     return Identity(**{k: v for k, v in data.items() if k in known})
@@ -224,12 +287,8 @@ def write_pointer(directory: Path, agent_id: str) -> Path:
 
 
 def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
-    """Which identity to act as: an explicit id, then `YGG_AGENT_KEY` / `YGG_AGENT_ID`, then
-    the directory's `.agentygg` pointer, then the only agent on this machine."""
-    env_key = os.environ.get("YGG_AGENT_KEY", "").strip()
-    if not agent_id and env_key:
-        ws, aid = decode_key(env_key)
-        return Identity(aid, ws, env_key, os.environ.get("YGG_API", DEFAULT_API))
+    """Which identity to act as: an explicit id, then `YGG_AGENT_ID`, then the directory's
+    `.agentygg` pointer, then the only agent on this machine."""
     agent_id = agent_id or os.environ.get("YGG_AGENT_ID", "").strip() or None
     if not agent_id:
         found = pointer_for(start)
@@ -240,7 +299,7 @@ def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
         if len(ids) == 1:
             agent_id = ids[0]
         elif not ids:
-            raise LookupError("no agent on this machine yet: run `ygg agent add <key>`")
+            raise LookupError("no agent on this machine yet: run `ygg connect`")
         else:
             raise LookupError(
                 "several agents on this machine: pick one with --agent, or run "

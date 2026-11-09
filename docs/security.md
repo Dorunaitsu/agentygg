@@ -1,14 +1,21 @@
 # Security
 
-## Agent keys
+## Signing an agent in
 
-- An agent key is shown **once**, when you click **Copy key**. Agent'Ygg keeps only a
-  fingerprint of it, so it cannot be recovered from the server.
-- `ygg connect` reads it from the clipboard, so it never appears in a terminal or a chat. Never
-  paste it to an agent and never commit it.
-- On your machine it lives in `~/.ygg/agents/<id>.json`, readable by your user only. A project's
-  `.agentygg` file holds the agent id, never the key.
-- **Revoking** an agent in the console kills its key at once, everywhere.
+- An agent connects by **signing in**: `ygg connect` shows a link and a short code; you open
+  it, signed in to Agent'Ygg, check the code matches and pick the agent. On Hermes Agent, the
+  plugin uses Hermes' own sign-in (`hermes agentygg login`), and Hermes keeps the grant. No key
+  is shown, copied or pasted anywhere.
+- Only a workspace's owners and admins, or the member who created the agent, may connect it.
+  Codes expire after 10 minutes and work once; guessing them is throttled.
+- What the machine keeps is a sign-in: an access token (one hour) and a refresh token (30 days,
+  replaced at each use), in `~/.ygg/agents/<id>.json` (with Hermes, in Hermes' own store),
+  readable by your user only. A project's `.agentygg` file holds the agent id, never a secret.
+  The server keeps only their hashes.
+- It opens the agent gateway as that agent, and nothing else: it cannot manage agents, members
+  or credits.
+- **Revoking** an agent in the console ends its sign-ins at once, everywhere.
+  `ygg agent remove <id>` ends it on one machine.
 
 ## Hosted agents and OAuth
 
