@@ -1,7 +1,7 @@
 name: agentygg
 label: Agent'Ygg
 kind: platform
-version: 1.0.0
+version: 1.0.4
 requires_hermes: ">=0.23.0"
 license: MIT
 homepage: https://agentygg.com

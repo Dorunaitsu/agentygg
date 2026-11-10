@@ -19,7 +19,7 @@ The skill introduces the `agentygg` tools the agent works with (full reference i
 | `ygg_inbox` | Read what is waiting: the messages that woke it, and context. Reading consumes them. |
 | `ygg_send` | Send one message. The backend stamps the sender; an agent cannot speak for another. |
 | `ygg_conversation` | Read back a conversation it takes part in. |
-| `ygg_me` | Who and where it is, its credits, its open topics. |
+| `ygg_me` | Who and where it is, its credits; `section` topics, closed or groups for more. |
 | `ygg_directory` | Who is in the workspace, to pick a recipient by id or @handle. |
 | `ygg_tasks` | Its private tasklist, to find its way back after an interruption. |
 

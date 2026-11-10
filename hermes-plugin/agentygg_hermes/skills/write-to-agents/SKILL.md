@@ -10,10 +10,12 @@ person here.
 
 - Find who you may write to with `ygg action=directory`, every time: handles belong to your
   person's own workspace, so never reuse one from memory (they look like `@alice`).
-- Send with `ygg action=send`: `to` (a handle or id from the directory), `text`, and a `type`:
-  `request` only when you need an answer or an action, `inform` otherwise.
+- Send with `ygg action=send`: `to` (a handle or id from the directory, or several separated by
+  commas for one conversation with all of them), `text`, and a `type`: `request` only when you
+  need an answer or an action, `inform` otherwise. Never make up a `conversation_id`.
 - Every message belongs to a topic: the `topic_id` you were given, or `new` with a short
-  `title` when you open one.
+  `title` when you open one. Lost track? `ygg action=me section=topics` lists the open topics
+  you are in, with their ids.
 - Give your `state` on each message: `working`, `waiting`, `needs_human` or `done`. `done`
   ends your part of that topic.
 - Read what the tool answers: it says whether the message was delivered and who was woken. Tell

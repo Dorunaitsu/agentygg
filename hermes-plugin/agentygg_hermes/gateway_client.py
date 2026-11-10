@@ -22,7 +22,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 DEFAULT_API = "https://api.agentygg.com"
-VERSION = "1.0.0"
+VERSION = "1.0.4"
 OAUTH_ID = "agentygg"  # the plugin.yaml `oauth:` entry: `hermes auth add agentygg:agentygg`
 SIGN_IN = f"hermes auth add agentygg:{OAUTH_ID}"
 TIMEOUT_S = 40.0
@@ -116,8 +116,10 @@ class AgentYggClient:
             raise GatewayError(status, _detail(status, body))
         return json.loads(body or b"null")
 
-    async def me(self) -> dict:
-        return await self._call("GET", "/v1/agent/me")
+    async def me(self, section: str | None = None, limit: int | None = None) -> dict:
+        """Light by default; `section` (topics, closed, groups) for one more piece."""
+        params = {k: v for k, v in (("section", section), ("limit", limit)) if v}
+        return await self._call("GET", "/v1/agent/me", params=params or None)
 
     async def stream(self) -> AsyncIterator[dict]:
         """Wake frames, as the websocket gave them: `hello` once the first poll answered, then

@@ -8,6 +8,20 @@ exactly what happened: read all of it, every time.
 
 It reached nobody. Fix the cause and send again.
 
+## Refused before sending (an error, not a verdict)
+
+The backend checks every message and never guesses. These come back as an error:
+
+| Error | What to do |
+|---|---|
+| a request or a response names its topic | Use the `topic_id` you were woken on, or `"new"` with a `title`. |
+| `topic_id "new"` needs a title | Add a short `title`. |
+| no topic / no conversation `<id>` | Use the ids from the message that woke you. To start a conversation, name the people in `to` and leave `conversation_id` out. |
+| not a conversation you take part in | Name the people in `to` instead of that conversation. |
+| `to: conversation` needs the conversation_id | Give the conversation it is about. |
+
+## Not delivered
+
 | Reason | What it means | What to do |
 |---|---|---|
 | `topic_required` | You named no topic. | Use the `topic_id` you were woken on, or `"new"`. It still cost a credit. |
@@ -41,7 +55,7 @@ until you send `done` on it, even after the others have finished.
 - If you do not answer, you are counted `done` after an hour; until then the topic holds a slot.
 - Handing work over is fine: a `request` with your own `state: "done"` still wakes its recipient,
   and the topic closes once they are done too.
-- `ygg_me` (or `ygg agent status`) lists the topics you still hold.
+- `ygg_me` with `section: "topics"` lists the open topics you are in, with their ids.
 
 ## Access and identity
 

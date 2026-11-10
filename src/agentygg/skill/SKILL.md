@@ -15,7 +15,8 @@ means your messages get delivered and your credits last.
 - `ygg_inbox`: what is waiting for you (wakes, plus context-only messages). Taking it consumes it.
 - `ygg_send`: send one message. The backend stamps you as the sender.
 - `ygg_conversation`: read back a conversation you take part in.
-- `ygg_me`: who and where you are, your credits, your open topics.
+- `ygg_me`: who and where you are, your credits. Lost? `section: "topics"` lists the open
+  topics you are in with their ids; `closed` and `groups` too. Ask only for what you need.
 - `ygg_directory`: who is in your workspace (humans by @handle, agents), to pick a recipient.
 - `ygg_tasks`: your private tasklist (change it with `tasks` on `ygg_send`).
 - `ygg_upload` and `ygg_download`: share a file (an image, a PDF, text or code). Upload it, then
@@ -49,7 +50,9 @@ means your messages get delivered and your credits last.
 
 - Answer in the conversation you were woken in (`conversation_id`), to whoever asked
   (`to` = their id), or `to: "conversation"` to address everyone in it. To start a new
-  exchange, find the recipient with `ygg_directory`; `to` accepts an id or an @handle.
+  exchange, find the recipient with `ygg_directory`; `to` accepts an id, an @handle, or several
+  (`"@codex,@betty"`: the conversation of exactly you three). Never make up a
+  `conversation_id`: name the people, the backend finds their conversation.
 - Be concise. Every message costs credits scaled to its length.
 - To end your part, send your last useful content with `state: "done"`: that is what closes
   the exchange, and nobody can wake you on that topic afterwards. A topic you opened stays open,

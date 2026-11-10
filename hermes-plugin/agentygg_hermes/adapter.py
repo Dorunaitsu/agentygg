@@ -32,6 +32,10 @@ PLATFORM = "agentygg"
 # turn is taken as ended without telling us (a crash, a lost hook) and the next one goes, on a
 # timer, whether or not anything else arrives.
 HOLD_MAX_S = 5 * 60.0
+# Another instance holds the agent (409): right after a restart it is this gateway's previous
+# run, whose lease lapses within LEASE_S; try again soon, and only past that blame a relay.
+BUSY_RETRY_S = 10.0
+LEASE_S = 60.0
 
 # Nobody reads an Agent'Ygg conversation who could approve or answer: what needs the person goes
 # to the agent's own conversation with them, whatever the app (Ray, 2026-11-06).
@@ -91,20 +95,21 @@ class AgentYggAdapter(BasePlatformAdapter):
         try:
             self.me = await self.client.me()
         except NotSignedIn as e:
-            self._set_fatal_error(
+            return self._cannot_connect(
                 "not_connected",
                 f"Agent'Ygg is not signed in here: run `{SIGN_IN}` ({e})",
                 retryable=False,
             )
-            return False
         except GatewayError as e:
-            self._set_fatal_error(
-                "refused", f"Agent'Ygg refused this agent: {e.detail}", retryable=e.status >= 500
+            return self._cannot_connect(
+                "refused",
+                f"Agent'Ygg refused this agent ({e.status}): {e.detail}",
+                retryable=e.status >= 500,
             )
-            return False
         except Exception as e:  # noqa: BLE001 - unreachable now, the gateway retries connect()
-            self._set_fatal_error("unreachable", f"Agent'Ygg is out of reach: {e}", retryable=True)
-            return False
+            return self._cannot_connect(
+                "unreachable", f"Agent'Ygg is out of reach: {e}", retryable=True
+            )
         _active = self
         self._task = asyncio.create_task(self._run())
         self._mark_connected()
@@ -112,6 +117,13 @@ class AgentYggAdapter(BasePlatformAdapter):
             "Agent'Ygg: connected as %s in %s", self.me.get("handle"), self.me.get("workspace_name")
         )
         return True
+
+    def _cannot_connect(self, code: str, message: str, *, retryable: bool) -> bool:
+        """Hermes logs a failed reconnect as only `Reconnect agentygg failed`: the reason goes to
+        the log here, or 41 attempts over 3 h 11 say nothing about why (Betty, 2026-11-09)."""
+        logger.warning("%s", message)
+        self._set_fatal_error(code, message, retryable=retryable)
+        return False
 
     async def disconnect(self) -> None:
         global _active
@@ -135,32 +147,64 @@ class AgentYggAdapter(BasePlatformAdapter):
         good; a second instance of the agent (a relay left running) is reported and retried
         slowly."""
         backoff = 2.0
+        failures = 0
+        busy_s = 0.0
         while True:
             try:
                 async for frame in self.client.stream():
                     if frame.get("kind") == "hello":
                         backoff = 2.0
+                        busy_s = 0.0
+                        if failures:
+                            logger.info(
+                                "Agent'Ygg: connection back after %d failed attempt%s",
+                                failures,
+                                "" if failures == 1 else "s",
+                            )
+                            failures = 0
                     elif frame.get("kind") == "wake":
                         await self._deliver(frame)
             except asyncio.CancelledError:
                 raise
             except NotSignedIn as e:
+                logger.error("Agent'Ygg: %s", e)
                 self._set_fatal_error("not_connected", f"Agent'Ygg: {e}", retryable=False)
                 return
             except GatewayError as e:
                 if e.status in (401, 403):
+                    logger.error("Agent'Ygg: refused (%s): %s", e.status, e.detail)
                     self._set_fatal_error("refused", f"Agent'Ygg: {e.detail}", retryable=False)
                     return
                 if e.status == 409:
-                    logger.error(
-                        "Agent'Ygg: %s. Run `ygg relay remove` for this agent: the plugin replaces "
-                        "the relay, and the two must not run together.",
-                        e.detail,
-                    )
-                    await asyncio.sleep(60)
+                    failures += 1
+                    if busy_s < LEASE_S + BUSY_RETRY_S:
+                        logger.warning(
+                            "Agent'Ygg: %s: the previous run's lease has not lapsed yet (up to "
+                            "%.0fs after a restart); retrying in %.0fs",
+                            e.detail,
+                            LEASE_S,
+                            BUSY_RETRY_S,
+                        )
+                    elif busy_s < LEASE_S + 2 * BUSY_RETRY_S:  # said once, then quietly retried
+                        logger.error(
+                            "Agent'Ygg: %s for over %.0fs: another instance runs this agent. Run "
+                            "`ygg relay remove` for it: the plugin replaces the relay, and the two "
+                            "must not run together.",
+                            e.detail,
+                            busy_s,
+                        )
+                    busy_s += BUSY_RETRY_S
+                    await asyncio.sleep(BUSY_RETRY_S)
                     continue
-                logger.warning("Agent'Ygg: %s; trying again", e.detail)
+                failures += 1
+                logger.warning(
+                    "Agent'Ygg: connection lost (%s: %s); retrying in %.0fs",
+                    e.status,
+                    e.detail,
+                    backoff,
+                )
             except Exception as e:  # noqa: BLE001 - network: try again
+                failures += 1
                 logger.warning("Agent'Ygg: connection lost (%s); retrying in %.0fs", e, backoff)
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60.0)
@@ -259,6 +303,13 @@ class AgentYggAdapter(BasePlatformAdapter):
         an Agent'Ygg notice that names no topic (a resume: there is nothing to answer). The
         message counts as answered once the send went through, so a failed send is retried."""
         p = self.conversations.current(conversation_id, message_id)
+        if p is not None and p.answered and (text or "").strip():
+            logger.info(
+                "Agent'Ygg: final text not sent in %s: %s was already answered with the ygg tool",
+                conversation_id,
+                p.message_id,
+            )
+            return None
         if p is None or p.answered or not (text or "").strip() or self.client is None:
             return None
         if p.sender == SYSTEM_ID and not p.topic_id:

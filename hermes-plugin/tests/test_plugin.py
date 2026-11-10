@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import types
 
 import agentygg_hermes as agentygg
@@ -150,6 +151,26 @@ async def test_the_tool_answers_the_current_message_and_the_final_text_is_not_se
     assert len(a.client.sent) == 1
 
 
+async def test_an_inform_from_the_tool_does_not_answer_a_request(caplog):
+    """Betty, 2026-11-10: an inform to `conversation` sent mid-turn marked the request answered,
+    and her final report (1443 characters) was dropped without a log line."""
+    a = _adapter()
+    await a._deliver(_wake("run part B", mid="m1"))
+    SESSION.update({"HERMES_SESSION_PLATFORM": "agentygg", "HERMES_SESSION_CHAT_ID": "conv_1"})
+    await tools.ygg({"action": "send", "to": "conversation", "type": "inform", "text": "check"})
+    await a.send("conv_1", "the report", reply_to="m1", metadata={"notify": True})
+    assert [s["text"] for s in a.client.sent] == ["check", "the report"]
+    assert a.client.sent[1]["type"] == "response" and a.client.sent[1]["in_reply_to"] == "m1"
+
+    # a response from the tool does answer it, and the skipped final text says so in the log
+    await a._deliver(_wake("again", mid="m2"))
+    await tools.ygg({"action": "send", "type": "response", "text": "answered"})
+    with caplog.at_level(logging.INFO):
+        await a.send("conv_1", "final words", reply_to="m2", metadata={"notify": True})
+    assert [s["text"] for s in a.client.sent][-1] == "answered"
+    assert "already answered" in caplog.text
+
+
 async def test_a_response_from_the_tool_defaults_to_the_message_being_answered():
     a = _adapter()
     await a._deliver(_wake())
@@ -205,6 +226,19 @@ async def test_with_no_turn_in_progress_the_tool_guesses_nothing():
     SESSION.update({"HERMES_SESSION_PLATFORM": "agentygg", "HERMES_SESSION_CHAT_ID": "conv_1"})
     out = await tools.ygg({"action": "send", "type": "inform", "text": "fyi"})
     assert "needs `to`" in out and len(a.client.sent) == 1
+
+
+async def test_after_its_answer_the_session_still_writes_in_its_conversation():
+    """Betty, 2026-11-09: once her turn was answered, every send to `conversation` went out
+    without a conversation and reached nobody."""
+    a = _adapter()
+    await a._deliver(_wake("your piece?", mid="m1"))
+    await a.send("conv_1", "here it is", reply_to="m1", metadata={"notify": True})
+    SESSION.update({"HERMES_SESSION_PLATFORM": "agentygg", "HERMES_SESSION_CHAT_ID": "conv_1"})
+    await tools.ygg({"action": "send", "to": "conversation", "type": "inform", "text": "wrap"})
+    sent = a.client.sent[-1]
+    assert sent["conversation_id"] == "conv_1" and sent["to"] == "conversation"
+    assert sent["topic_id"] == a.conversations.pending["conv_1"][-1].topic_id
 
 
 async def test_a_message_waits_for_the_turn_before_it_so_hermes_never_merges_them():
@@ -322,7 +356,7 @@ async def test_a_handle_that_differs_from_the_id_is_recognised():
     frame["from"]["label"] = "Betty (@betty)"
     await a._deliver(frame)
     SESSION.update({"HERMES_SESSION_PLATFORM": "agentygg", "HERMES_SESSION_CHAT_ID": "conv_1"})
-    await tools.ygg({"action": "send", "to": "@betty", "type": "inform", "text": "fyi"})
+    await tools.ygg({"action": "send", "to": "@betty", "type": "response", "text": "fyi"})
     assert a.client.sent[0]["topic_id"] == "top_1"
     await a.send("conv_1", "again", reply_to="m1", metadata={"notify": True})
     assert len(a.client.sent) == 1
@@ -514,6 +548,99 @@ async def test_without_a_sign_in_the_platform_stops_with_a_clear_reason():
     assert await a.connect() is False  # Hermes holds no grant for the plugin yet
     assert a.fatal[0] == "not_connected" and a.fatal[2] is False
     assert "hermes auth add agentygg:agentygg" in a.fatal[1]
+
+
+async def test_a_failed_connect_writes_its_reason_to_the_gateway_log(caplog):
+    """Betty, 2026-11-09: 41 reconnects over 3 h 11, each logged by Hermes as only `Reconnect
+    agentygg failed`. The reason the plugin knew never reached the log."""
+    from conftest import HERMES_HTTP
+
+    HERMES_HTTP["handler"] = lambda *a: (403, {}, b'{"detail":"identity revoked"}')
+    a = ad.AgentYggAdapter(config=None)
+    with caplog.at_level(logging.WARNING):
+        assert await a.connect() is False
+    assert "identity revoked" in caplog.text
+
+    caplog.clear()
+    SECRETS["AGENTYGG_CLIENT_ID"] = "hermes"
+    HERMES_HTTP["handler"] = None  # Hermes holds no grant
+    with caplog.at_level(logging.WARNING):
+        assert await a.connect() is False
+    assert "hermes auth add agentygg:agentygg" in caplog.text
+
+
+async def test_a_stream_that_comes_back_says_so(caplog, monkeypatch):
+    """A 502 burst at 14:11 was logged, the recovery was not: messages flowed again with no line
+    to show when (Betty, 2026-11-09)."""
+    from conftest import HERMES_HTTP
+
+    real_sleep = asyncio.sleep
+
+    async def no_wait(_s):
+        await real_sleep(0)
+
+    answers = iter([(502, {}, b"Bad Gateway")])
+
+    def network(method, url, body, headers):
+        if url.endswith("/v1/agent/me"):
+            return 200, {}, json.dumps({"handle": "@betty", "workspace_name": "Lab"}).encode()
+        import time
+
+        time.sleep(0.01)
+        return next(answers, (200, {}, b'{"wakes": [], "mailbox": [], "batch": ""}'))
+
+    HERMES_HTTP["handler"] = network
+    a = ad.AgentYggAdapter(config=None)
+    assert await a.connect() is True
+    monkeypatch.setattr(ad.asyncio, "sleep", no_wait)
+    with caplog.at_level(logging.INFO):
+        for _ in range(50):
+            await real_sleep(0.01)
+            if "back after" in caplog.text:
+                break
+    monkeypatch.undo()
+    await a.disconnect()
+    assert "502" in caplog.text and "back after 1 failed attempt" in caplog.text
+
+
+async def test_a_lease_still_held_after_a_restart_is_retried_soon_without_blaming_a_relay(
+    caplog, monkeypatch
+):
+    """Betty, 2026-11-10: right after a gateway restart the previous run's lease (60 s) answered
+    409 identity_busy; the plugin logged "run ygg relay remove" and waited a full minute."""
+    from conftest import HERMES_HTTP
+
+    real_sleep = asyncio.sleep
+    waits: list[float] = []
+
+    async def no_wait(s):
+        waits.append(s)
+        await real_sleep(0)
+
+    answers = iter([(409, {}, b'{"detail":"identity_busy"}')] * 2)
+
+    def network(method, url, body, headers):
+        if url.endswith("/v1/agent/me"):
+            return 200, {}, json.dumps({"handle": "@betty", "workspace_name": "Lab"}).encode()
+        import time
+
+        time.sleep(0.01)
+        return next(answers, (200, {}, b'{"wakes": [], "mailbox": [], "batch": ""}'))
+
+    HERMES_HTTP["handler"] = network
+    a = ad.AgentYggAdapter(config=None)
+    assert await a.connect() is True
+    monkeypatch.setattr(ad.asyncio, "sleep", no_wait)
+    with caplog.at_level(logging.INFO):
+        for _ in range(50):
+            await real_sleep(0.01)
+            if "back after" in caplog.text:
+                break
+    monkeypatch.undo()
+    await a.disconnect()
+    assert waits[:2] == [ad.BUSY_RETRY_S] * 2 and ad.BUSY_RETRY_S <= 10
+    assert "relay remove" not in caplog.text and "ERROR" not in caplog.text
+    assert "back after 2 failed attempts" in caplog.text
 
 
 async def test_the_platform_connects_through_hermes_requests():

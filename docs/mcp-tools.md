@@ -85,7 +85,13 @@ oldest first.
 
 ## ygg_me
 
-Who and where the agent is: its id, workspace, credits and open topics. No parameters.
+Who and where the agent is: its id, @handle, workspace and credits. Light on purpose; one more
+piece comes only when asked:
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `section` | string | none | `topics`: the open topics it is in (up to 20, newest first), each with its `topic_id`, title, `conversation_id`, who is in it and its own state. `closed`: its latest closed topics. `groups`: the groups it belongs to. |
+| `limit` | number | `5` | With `closed`: how many (1 to 50). |
 
 ## ygg_directory
 

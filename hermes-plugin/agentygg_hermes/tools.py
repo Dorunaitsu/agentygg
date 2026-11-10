@@ -41,14 +41,18 @@ DESCRIPTION = (
     "Agent'Ygg: talk with other agents (on any harness) and the people of your workspace. "
     "action=send writes a message: type request (needs an answer; the only type that wakes "
     "someone), response (answers a request; in an Agent'Ygg conversation it answers the message "
-    "you were woken for by default) or inform (no reply needed); state working, waiting (with "
+    "you were woken for by default) or inform (no reply needed, and never an answer). In an "
+    "Agent'Ygg conversation your turn's final text is sent for you as the answer to the message "
+    "you were woken for, unless you already sent it a response. State working, waiting (with "
     "waiting_for), needs_human (with need: one line, at most 80 characters, for the person) or "
     'done (your part is over: it frees your topic slot). A new exchange needs topic_id "new" '
     "and a short title. Never send thanks or acknowledgments. action=ask_human hands what needs "
     "your person (an approval, a decision, information only they have) to your own conversation "
     "with them, which asks them and answers the agent. action=directory lists who you can "
     "write to; action=conversation reads the end of a conversation; action=download saves an "
-    "attached file and returns its path; action=me shows your identity and credits."
+    "attached file and returns its path; action=me shows your identity and credits, and with "
+    "section one more piece when you need it: topics (the open topics you are in, with their "
+    "ids), closed (your latest closed ones) or groups."
 )
 
 PARAMETERS: dict[str, Any] = {
@@ -60,7 +64,7 @@ PARAMETERS: dict[str, Any] = {
         },
         "to": {
             "type": "string",
-            "description": 'send: an @handle, an id, or "conversation" (everyone in it).',
+            "description": 'send: an @handle, an id, several of them ("@codex,@claude-code": the conversation of all of you), or "conversation" (everyone in it).',
         },
         "type": {"type": "string", "enum": ["request", "response", "inform"]},
         "text": {"type": "string"},
@@ -78,9 +82,10 @@ PARAMETERS: dict[str, Any] = {
             "description": "send with state needs_human: what you need, one line.",
         },
         "file_id": {"type": "string", "description": "download: the attached file's id."},
+        "section": {"type": "string", "enum": ["topics", "closed", "groups"]},
         "limit": {
             "type": "integer",
-            "description": "conversation: how many messages (default 20).",
+            "description": "conversation: how many messages (default 20); me closed: how many.",
         },
     },
     "required": ["action"],
@@ -131,14 +136,24 @@ async def _send(client: AgentYggClient, args: dict) -> str:
     cid = args.get("conversation_id") or _session_conversation()
     adapter = active_adapter()
     pending = adapter.conversations.current(cid) if adapter is not None and cid else None
-    to = args.get("to") or (pending.sender if pending else None)
+    # Once the turn's message is answered there is no turn in progress, yet the session is still
+    # this conversation: its latest message says who and which topic (Betty, 2026-11-09: every
+    # later send to `conversation` went out with no conversation and reached nobody).
+    latest = pending or (
+        (adapter.conversations.pending.get(cid) or [None])[-1]
+        if adapter is not None and cid
+        else None
+    )
+    to = args.get("to") or (pending.sender if pending else None)  # never guessed
     if not to:
         return "send needs `to` (see action directory)."
     kind = args.get("type") or ("response" if pending and pending.type == "request" else "inform")
-    here = pending is not None and (to == "conversation" or pending.is_sender(to))
-    topic = args.get("topic_id") or (pending.topic_id if here and not args.get("title") else None)
+    here = bool(cid) and (to == "conversation" or (latest is not None and latest.is_sender(to)))
+    topic = args.get("topic_id") or (
+        latest.topic_id if here and latest is not None and not args.get("title") else None
+    )
     in_reply_to = args.get("in_reply_to")
-    if kind == "response" and not in_reply_to and here and pending.type == "request":
+    if kind == "response" and not in_reply_to and here and pending and pending.type == "request":
         in_reply_to = pending.message_id
     r = await client.send(
         type=kind,
@@ -152,7 +167,21 @@ async def _send(client: AgentYggClient, args: dict) -> str:
         waiting_for=args.get("waiting_for"),
         need=args.get("need"),
     )
-    if here and r.get("verdict") != "DROP" and r.get("reason") not in REFUSED:
+    # What answers the message being handled: for a request, a response, a message naming it
+    # (in_reply_to) or a request back to its sender (the ball sent back, PoC 2026-11-06); an
+    # inform is progress and the turn's final text still goes (Betty, 2026-11-10: an inform to
+    # `conversation` swallowed her report). Anything said here answers a notice or an inform.
+    answers = (
+        here
+        and pending is not None
+        and (
+            pending.type != "request"
+            or kind == "response"
+            or in_reply_to == pending.message_id
+            or (kind == "request" and pending.is_sender(to))
+        )
+    )
+    if answers and r.get("verdict") != "DROP" and r.get("reason") not in REFUSED:
         pending.answered = True  # the turn's final text is not sent again
     return describe_send(r)
 
@@ -273,7 +302,9 @@ async def ygg(args: dict, **_kwargs: Any) -> str:
         if action == "download":
             return await _download(client, args)
         if action == "me":
-            return json.dumps(await client.me(), ensure_ascii=False)
+            return json.dumps(
+                await client.me(args.get("section"), args.get("limit")), ensure_ascii=False
+            )
         return f"unknown action {action!r}"
     except GatewayError as e:
         return f"Agent'Ygg refused it ({e.status}): {e.detail}"
