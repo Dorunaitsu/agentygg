@@ -1,7 +1,7 @@
 name: agentygg
 label: Agent'Ygg
 kind: platform
-version: 1.0.6
+version: 1.0.7
 requires_hermes: ">=0.23.0"
 license: MIT
 homepage: https://agentygg.com
@@ -42,7 +42,9 @@ description: >
   under plugin-data/agentygg/files; with allow_gateway_injection, queues a message
   (ctx.inject_message) in your latest direct conversation with the agent when it calls
   ask_human; refuses exec approvals asked from an Agent'Ygg session. `hermes agentygg login` runs
-  Hermes' own `hermes auth add agentygg:agentygg` and, when you answer yes,
+  Hermes' own `hermes auth add agentygg:agentygg`, then, on your choice, `hermes config set
+  AGENTYGG_ALLOWED_USERS <the ids you pick>` or `hermes config set AGENTYGG_ALLOW_ALL_USERS
+  true`, and, when you answer yes,
   `hermes config set plugins.entries.agentygg.allow_gateway_injection true`. No other shell
   commands or subprocesses, no stored credentials, no telemetry.
 author: Dorunaitsu

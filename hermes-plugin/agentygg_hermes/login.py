@@ -175,10 +175,79 @@ def _senders() -> None:
     )
 
 
+def _input_tty(question: str) -> str:
+    """A typed answer, or "" with nobody at the terminal."""
+    if not sys.stdin.isatty():
+        return ""
+    try:
+        return input(question).strip()
+    except EOFError:
+        return ""
+
+
+SENDERS_PROMPT = (
+    "Who may write to this agent on Agent'Ygg (each message runs a turn with its memory and "
+    "tools)?\n  1) Only the ones you pick (recommended)\n  2) Everyone in the workspace\n"
+    "(The Agent'Ygg console can also limit, on its server, who may write to this agent and who "
+    "may read its conversations.) Choice [1]: "
+)
+
+
+def choose_senders(
+    run: Callable[..., object] = subprocess.run, pick: Callable[[str], str] = _input_tty
+) -> None:
+    """After sign-in: restricted by default, picked one by one from the agent's workspace, or the
+    whole workspace (Ray, 2026-11-11). Saved with Hermes' own config set; nobody at the terminal
+    or a list already set changes nothing (Hermes' default deny stays)."""
+    import asyncio
+
+    from gateway.platforms._shared import get_scoped_secret
+
+    from .gateway_client import AgentYggClient, GatewayError, NotSignedIn
+
+    current = (get_scoped_secret("AGENTYGG_ALLOWED_USERS", "") or "").strip()
+    everyone = (get_scoped_secret("AGENTYGG_ALLOW_ALL_USERS", "") or "").strip()
+    if current or everyone:
+        print(f"Senders kept as they are ({current or 'everyone in the workspace'}).")
+        return
+    try:
+        found = asyncio.run(AgentYggClient().directory())
+    except (GatewayError, NotSignedIn):
+        found = {}
+    rows = [(p.get("id"), p.get("handle"), "person") for p in found.get("humans") or []]
+    rows += [
+        (a.get("id"), a.get("handle"), "agent")
+        for a in found.get("agents") or []
+        if not a.get("you")
+    ]
+    if rows:
+        print("In this agent's workspace:")
+        for i, (_rid, rhandle, kind) in enumerate(rows, 1):
+            print(f"  [{i}] {rhandle} ({kind})")
+    later = 'Later: hermes config set AGENTYGG_ALLOWED_USERS "system.ygg,<ids>" (see hermes agentygg status).'
+    choice = pick(SENDERS_PROMPT)
+    if choice == "2":
+        ok, why = _run_hermes(["config", "set", "AGENTYGG_ALLOW_ALL_USERS", "true"], run=run)
+        print("Everyone in the workspace may write to it." if ok else f"Not saved ({why}).")
+        return
+    numbers = pick("Who may write, by number, comma-separated (empty: nobody yet): ")
+    picked = []
+    for n in numbers.replace(" ", "").split(","):
+        if n.isdigit() and 1 <= int(n) <= len(rows) and rows[int(n) - 1][0]:
+            picked.append(str(rows[int(n) - 1][0]))
+    if not picked:
+        print(f"Nobody may write to it yet: Hermes refuses every sender. {later}")
+        return
+    value = ",".join(["system.ygg", *dict.fromkeys(picked)])
+    ok, why = _run_hermes(["config", "set", "AGENTYGG_ALLOWED_USERS", value], run=run)
+    print(f"Allowed to write: {value}" if ok else f"Not saved ({why}). {later}")
+
+
 def run_cli(
     args,
     ask: Callable[[str], bool] = _ask_tty,
     run: Callable[..., object] = subprocess.run,
+    pick: Callable[[str], str] = _input_tty,
 ) -> int:
     cmd = getattr(args, "agentygg_cmd", None) or "status"
     if cmd == "login":
@@ -193,6 +262,7 @@ def run_cli(
                 f"Not connected ({why}). Run it yourself, in a terminal: hermes auth add {AUTH_KEY}"
             )
             return 1
+        choose_senders(run=run, pick=pick)
         if not questions:
             print(f"It will decline what needs you. To change your mind: {QUESTIONS_COMMAND}")
         else:

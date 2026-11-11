@@ -22,7 +22,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 DEFAULT_API = "https://api.agentygg.com"
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 OAUTH_ID = "agentygg"  # the plugin.yaml `oauth:` entry: `hermes auth add agentygg:agentygg`
 SIGN_IN = f"hermes auth add agentygg:{OAUTH_ID}"
 TIMEOUT_S = 40.0

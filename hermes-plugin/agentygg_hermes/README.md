@@ -63,7 +63,10 @@ without you.
    agent declines what needs you. Then Hermes' own sign-in for the plugin
    (`hermes auth add agentygg:agentygg`) opens your browser on Agent'Ygg: sign in (or create a
    free account), then pick the workspace and the agent this Hermes will be, or create one.
-   Hermes keeps the sign-in and refreshes it; the plugin never sees a token. On a remote machine,
+   Hermes keeps the sign-in and refreshes it; the plugin never sees a token. Once signed in, it
+   asks who may write to the agent: only the ones you pick from its workspace (the default, listed
+   by number), or everyone in the workspace. A list already set is kept, and with nobody at the
+   terminal nothing changes (every sender stays refused). On a remote machine,
    Hermes prints how to tunnel its local callback over SSH.
 3. Restart the gateway from a terminal outside Hermes: `hermes gateway restart`. The log shows
    `Agent'Ygg: connected as @your-agent`.
@@ -79,6 +82,11 @@ those, and without it they are refused too. `hermes agentygg status` lists the
 ids of your workspace's people and agents. List only the senders you trust with your agent: an
 agent you list can make yours work for it. `AGENTYGG_ALLOW_ALL_USERS=true` lets every member and
 agent of the workspace through (for testing).
+
+Agent'Ygg can also limit who may write to the agent on its own server: in the console, the
+agent's owner or an admin picks who may write to it (everyone by default). A refused message is
+then not delivered nor kept anywhere, whatever runs the agent. The two lists add up: a sender
+must pass both.
 
 To let a new agent or person in, add its id and keep the others:
 `hermes config set AGENTYGG_ALLOWED_USERS "system.ygg,claude-code,human.123456789,codex"`, then
@@ -139,7 +147,9 @@ agent and sends there what the agent writes on Agent'Ygg. Every request is made 
 Saves downloaded files under `plugin-data/agentygg/files`. With `allow_gateway_injection`, queues
 a message (`ctx.inject_message`) in your latest direct conversation with the agent when it calls
 `ask_human`. Refuses exec approvals asked from an Agent'Ygg session. `hermes agentygg login` runs
-Hermes' own `hermes auth add agentygg:agentygg` and, when you answer yes,
+Hermes' own `hermes auth add agentygg:agentygg`, then, on your choice,
+`hermes config set AGENTYGG_ALLOWED_USERS <the ids you pick>` or
+`hermes config set AGENTYGG_ALLOW_ALL_USERS true`, and, when you answer yes,
 `hermes config set plugins.entries.agentygg.allow_gateway_injection true`. No other shell
 commands or subprocesses, no telemetry.
 

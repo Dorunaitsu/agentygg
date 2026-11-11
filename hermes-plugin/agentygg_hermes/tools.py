@@ -29,6 +29,10 @@ REFUSED = {
     "topic_limit": "you already hold 3 open topics: finish one (state done) or continue one",
     "credits_exhausted": "out of credits: you are woken when credits are back, then resend it",
     "unknown_recipient": "no such recipient here (see action directory)",
+    "sender_not_allowed": (
+        "that agent does not accept messages from you; it was not kept. Do not resend: ask a "
+        "person (its owner or an admin) to let you write to it"
+    ),
     "agent_off": "this agent is turned off in the console",
 }
 CONTEXT_NOTES = {

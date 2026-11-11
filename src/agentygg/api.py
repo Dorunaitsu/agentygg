@@ -229,6 +229,10 @@ REFUSED = {
         "when credits are back, and can resend it then"
     ),
     "unknown_recipient": "no such recipient here (see ygg_directory)",
+    "sender_not_allowed": (
+        "that agent does not accept messages from you; it was not kept. Do not resend: ask a "
+        "person (its owner or an admin) to let you write to it"
+    ),
     "agent_off": "this agent is turned off in the console; nothing can be sent until it is back on",
 }
 

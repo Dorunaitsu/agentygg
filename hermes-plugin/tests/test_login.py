@@ -195,3 +195,56 @@ def test_nobody_at_the_terminal_means_no_questions(monkeypatch):
     for answer, expected in (("", False), ("n", False), ("y", True), ("yes", True), ("oui", True)):
         monkeypatch.setattr("builtins.input", lambda _p, a=answer: a)
         assert login._ask_tty(login.QUESTIONS_PROMPT) is expected, answer
+
+
+def _directory_network(method, url, body, headers):
+    assert url.endswith("/v1/agent/directory")
+    people = {"humans": [{"id": "human.1", "handle": "@ray", "name": "Ray"}]}
+    agents = [
+        {"id": "betty", "handle": "@betty", "you": True},
+        {"id": "claude-code", "handle": "@claude-code"},
+        {"id": "codex", "handle": "@codex"},
+    ]
+    return 200, {}, json.dumps({**people, "agents": agents}).encode()
+
+
+def _login_with(tmp_path, monkeypatch, answers):
+    hermes = _fake_hermes(tmp_path)
+    monkeypatch.setattr(login.sys, "argv", [str(hermes), "agentygg", "login"])
+    HERMES_HTTP["handler"] = _directory_network
+    ran, asked = [], []
+    replies = iter(answers)
+    code = login.run_cli(
+        types.SimpleNamespace(agentygg_cmd="login", no_questions=True),
+        ask=lambda q: False,
+        run=lambda cmd, **kw: ran.append(cmd) or _hermes_ok(cmd),
+        pick=lambda q: asked.append(q) or next(replies),
+    )
+    return (
+        code,
+        [c for c in ran if "AGENTYGG_ALLOWED_USERS" in c or "AGENTYGG_ALLOW_ALL_USERS" in c],
+        asked,
+    )
+
+
+def test_login_lets_the_person_pick_who_may_write(tmp_path, monkeypatch, capsys):
+    """Ray, 2026-11-11: restricted by default, picked one by one from the workspace."""
+    code, config, asked = _login_with(tmp_path, monkeypatch, ["", "1,3"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "@ray" in out and "@codex" in out and "@betty" not in out  # never itself
+    assert config == [
+        [*config[0][:-4], "config", "set", "AGENTYGG_ALLOWED_USERS", "system.ygg,human.1,codex"]
+    ]
+    assert "conversations" in asked[0] or "console" in out
+
+
+def test_login_can_open_the_agent_to_the_whole_workspace(tmp_path, monkeypatch):
+    code, config, _ = _login_with(tmp_path, monkeypatch, ["2"])
+    assert code == 0 and config[0][-4:] == ["config", "set", "AGENTYGG_ALLOW_ALL_USERS", "true"]
+
+
+def test_login_keeps_a_sender_list_already_set(tmp_path, monkeypatch):
+    SECRETS["AGENTYGG_ALLOWED_USERS"] = "system.ygg,claude-code"
+    code, config, asked = _login_with(tmp_path, monkeypatch, [])
+    assert code == 0 and config == [] and asked == []

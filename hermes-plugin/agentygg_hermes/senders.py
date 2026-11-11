@@ -31,3 +31,32 @@ def allowed(sender: str, me: str = "") -> bool:
         return True
     listed = ",".join(_env(n) for n in ("AGENTYGG_ALLOWED_USERS", "GATEWAY_ALLOWED_USERS"))
     return sender in {x.strip() for x in listed.split(",") if x.strip()}
+
+
+def visible(entry: dict, me: str = "") -> dict | None:
+    """A context entry as the agent may see it, or None. A message from a refused sender is
+    dropped; a system notice quoting other messages (topic_history) is rebuilt from its
+    structured history with the allowed senders' lines only, and dropped when none is left."""
+    env = entry.get("envelope") or {}
+    if not allowed(str(env.get("from") or ""), me):
+        return None
+    history = ((env.get("payload") or {}).get("data") or {}).get("history")
+    if not isinstance(history, list):
+        return entry
+    kept = [h for h in history if isinstance(h, dict) and allowed(str(h.get("from") or ""), me)]
+    if not kept:
+        return None
+    if len(kept) == len(history):
+        return entry
+    # A head of our own, never the notice's text: only ids, so nothing quoted survives in it.
+    head = (
+        f"Earlier messages of topic {env.get('topic_id')} in conversation "
+        f"{env.get('conversation_id')}, from senders you allow only:"
+    )
+    lines = [f"{h.get('from')}: {h.get('text')}" for h in kept]
+    payload = {
+        **(env.get("payload") or {}),
+        "text": "\n".join([head, *lines]),
+        "data": {"history": kept},
+    }
+    return {**entry, "envelope": {**env, "payload": payload}}

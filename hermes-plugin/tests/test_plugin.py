@@ -127,6 +127,37 @@ async def test_context_from_a_sender_hermes_refuses_never_reaches_the_agent():
     assert "refused sender's words" in await tools._conversation(Reader(), {})
 
 
+async def test_a_topic_history_notice_keeps_only_allowed_senders_lines():
+    """Controlled test, 2026-11-11: a topic moving into a conversation hands newcomers a system.ygg
+    notice quoting its last messages, a refused sender's included. system.ygg is allowed, so the
+    notice passes: the plugin rebuilds it from its structured history, allowed senders only."""
+    SECRETS["AGENTYGG_ALLOWED_USERS"] = "system.ygg,claude-code"
+    a = _adapter()
+    a.me = {"agent_id": "betty"}
+    history = _wake(
+        "You were added ... codex: MARKER-R1", sender="system.ygg", mid="m_h", cid="conv_9"
+    )
+    history["envelope"]["type"] = "inform"
+    history["envelope"]["meta"] = {"system_reason": "topic_history"}
+    history["envelope"]["payload"]["data"] = {
+        "history": [
+            {"from": "codex", "text": "MARKER-R1 refused"},
+            {"from": "claude-code", "text": "allowed line"},
+        ]
+    }
+    only_refused = _wake("codex: MARKER-R9", sender="system.ygg", mid="m_h2", cid="conv_9")
+    only_refused["envelope"]["meta"] = {"system_reason": "topic_history"}
+    only_refused["envelope"]["payload"]["data"] = {
+        "history": [{"from": "codex", "text": "MARKER-R9"}]
+    }
+    notice = _wake("[system:closure_poll]", sender="system.ygg", mid="m_sys", cid="conv_9")
+    notice["mailbox"] = [history, only_refused]
+    await a._deliver(notice)
+    text = a.handled[0].text
+    assert "MARKER-R1" not in text and "MARKER-R9" not in text
+    assert "allowed line" in text
+
+
 async def test_a_plain_reply_answers_the_request_it_was_woken_for_once():
     a = _adapter()
     await a._deliver(_wake())
