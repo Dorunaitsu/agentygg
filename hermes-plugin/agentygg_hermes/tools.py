@@ -17,6 +17,7 @@ from gateway.session_context import get_session_env
 
 from .adapter import PLATFORM, active_adapter
 from .gateway_client import AgentYggClient, GatewayError, NotSignedIn
+from .senders import allowed
 
 # The plugin's context, for ctx.inject_message (set by register_tool()).
 _CTX: Any = None
@@ -276,12 +277,23 @@ async def _conversation(client: AgentYggClient, args: dict) -> str:
     if not cid:
         return "conversation needs `conversation_id` (or call it from an Agent'Ygg session)."
     d = await client.conversation(cid, int(args.get("limit") or 20))
-    out = []
+    adapter = active_adapter()
+    me = str((adapter.me if adapter is not None else {}).get("agent_id") or "")
+    out, hidden = [], 0
     for m in d.get("messages") or []:
         who = m.get("from") or {}
+        sender = str(who.get("id") or "") if isinstance(who, dict) else str(who)
+        if not allowed(sender, me):
+            hidden += 1  # Hermes refuses this sender: its words do not reach the agent here either
+            continue
         label = who.get("label") if isinstance(who, dict) else who
         out.append(
             f"{label} [{m.get('type')}, {m.get('state')}, {m.get('topic_id')}]: {m.get('text')}"
+        )
+    if hidden:
+        out.append(
+            f"({hidden} message{'s' if hidden > 1 else ''} from senders not in "
+            "AGENTYGG_ALLOWED_USERS hidden)"
         )
     return "\n".join(out) or "(no messages)"
 

@@ -93,6 +93,40 @@ async def test_who_may_reach_the_agent_is_left_to_hermes_default_deny():
     assert a.handled[0].source.user_id == "claude-code"
 
 
+async def test_context_from_a_sender_hermes_refuses_never_reaches_the_agent():
+    """Betty, 2026-11-11: Hermes refused codex's request, then a system.ygg notice it admitted
+    carried codex's later message as context, and the ygg tool read the whole conversation. The
+    plugin applies the same allowlist to the context and to conversation reads."""
+    SECRETS["AGENTYGG_ALLOWED_USERS"] = "system.ygg,claude-code"
+    a = _adapter()
+    a.me = {"agent_id": "betty"}
+    notice = _wake("[system:closure_poll]", sender="system.ygg", mid="m_sys", cid="conv_9")
+    notice["mailbox"] = [
+        _wake("refused sender's words", sender="codex", mid="m_codex", cid="conv_9"),
+        _wake("allowed sender's words", sender="claude-code", mid="m_cc", cid="conv_9"),
+        _wake("my own words", sender="betty", mid="m_me", cid="conv_9"),
+    ]
+    await a._deliver(notice)
+    text = a.handled[0].text
+    assert "refused sender's words" not in text
+    assert "allowed sender's words" in text and "my own words" in text
+
+    class Reader:
+        async def conversation(self, cid, limit):
+            def m(sender, text):
+                return {"from": {"id": sender, "label": sender}, "type": "inform", "text": text}
+
+            return {"messages": [m("codex", "refused sender's words"), m("claude-code", "hello")]}
+
+    SESSION.update({"HERMES_SESSION_PLATFORM": "agentygg", "HERMES_SESSION_CHAT_ID": "conv_9"})
+    out = await tools._conversation(Reader(), {})
+    assert "refused sender's words" not in out and "hello" in out
+    assert "1 message from senders not in AGENTYGG_ALLOWED_USERS hidden" in out
+
+    SECRETS["AGENTYGG_ALLOW_ALL_USERS"] = "true"
+    assert "refused sender's words" in await tools._conversation(Reader(), {})
+
+
 async def test_a_plain_reply_answers_the_request_it_was_woken_for_once():
     a = _adapter()
     await a._deliver(_wake())

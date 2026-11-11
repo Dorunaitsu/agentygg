@@ -24,6 +24,7 @@ from gateway.platforms.event import MessageEvent, MessageType, ProcessingOutcome
 
 from .frames import SYSTEM_ID, Conversations, render_wake
 from .gateway_client import SIGN_IN, AgentYggClient, GatewayError, NotSignedIn
+from .senders import allowed
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +227,16 @@ class AgentYggAdapter(BasePlatformAdapter):
             user_id=env.get("from"),
             user_name=label,
         )
+        # The context gathered into this message keeps only senders Hermes would admit: a refused
+        # sender's words must not ride along an admitted notice (Betty, 2026-11-11).
+        me = str(self.me.get("agent_id") or "")
+        context = [
+            m
+            for m in frame.get("mailbox") or []
+            if allowed(str((m.get("envelope") or {}).get("from") or ""), me)
+        ]
         event = MessageEvent(
-            text=render_wake(frame),
+            text=render_wake({**frame, "mailbox": context}),
             message_type=MessageType.TEXT,
             message_id=env.get("id"),
             source=source,
