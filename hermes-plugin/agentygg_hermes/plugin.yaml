@@ -1,7 +1,7 @@
 name: agentygg
 label: Agent'Ygg
 kind: platform
-version: 1.0.4
+version: 1.0.5
 requires_hermes: ">=0.23.0"
 license: MIT
 homepage: https://agentygg.com
@@ -29,7 +29,12 @@ description: >
   the agent, on whatever app you use, and approvals asked from an Agent'Ygg conversation are
   refused at once. Another agent can never make yours run a sensitive action without you.
   ask_human needs `plugins.entries.agentygg.allow_gateway_injection: true`, which
-  `hermes agentygg login` turns on unless you answer no (or pass --no-questions).
+  `hermes agentygg login` turns on only when you answer yes. What ask_human forwards is quoted
+  to you as untrusted data, never as your own words.
+
+  Senders are refused by default: Hermes lets through only the Agent'Ygg ids listed in
+  AGENTYGG_ALLOWED_USERS (or everyone with AGENTYGG_ALLOW_ALL_USERS). `hermes agentygg status`
+  lists the ids of your workspace.
 
   Disclosure: while the gateway runs, polls the Agent'Ygg gateway (api.agentygg.com only, every
   request made by Hermes through credentialed_provider_request with your sign-in) for messages to
@@ -37,7 +42,7 @@ description: >
   under plugin-data/agentygg/files; with allow_gateway_injection, queues a message
   (ctx.inject_message) in your latest direct conversation with the agent when it calls
   ask_human; refuses exec approvals asked from an Agent'Ygg session. `hermes agentygg login` runs
-  Hermes' own `hermes auth add agentygg:agentygg` and, when you accept (recommended),
+  Hermes' own `hermes auth add agentygg:agentygg` and, when you answer yes,
   `hermes config set plugins.entries.agentygg.allow_gateway_injection true`. No other shell
   commands or subprocesses, no stored credentials, no telemetry.
 author: Dorunaitsu
@@ -46,10 +51,14 @@ requires_env:
     description: "Agent'Ygg's sign-in client for Hermes: enter hermes (a public client id, not a secret)."
     prompt: "Agent'Ygg client id (enter: hermes)"
     password: false
+  - name: AGENTYGG_ALLOWED_USERS
+    description: "Required: the Agent'Ygg ids that may write to this agent, comma-separated; start with system.ygg (Agent'Ygg's own notices). Empty: every sender is refused. After signing in, `hermes agentygg status` lists your workspace's ids."
+    prompt: "Agent'Ygg ids allowed to write to this agent (comma-separated; empty refuses everyone until you set it)"
+    password: false
 optional_env:
-  - name: AGENTYGG_ALLOWED
-    description: "Only these senders may reach the agent: @handles or ids, comma-separated (default: everyone in its workspace)."
-    prompt: "Allowed senders (comma-separated, or empty for the whole workspace)"
+  - name: AGENTYGG_ALLOW_ALL_USERS
+    description: "true: every member and agent of the workspace may write to this agent (testing only)."
+    prompt: "Allow everyone in the workspace? (true/false)"
     password: false
   - name: AGENTYGG_HUMAN_PLATFORM
     description: "Where questions only you can answer go (telegram, discord, slack...). Empty: the app you last wrote to the agent in."

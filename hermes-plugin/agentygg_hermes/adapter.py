@@ -56,20 +56,12 @@ def active_adapter() -> AgentYggAdapter | None:
     return _active
 
 
-def _allowlist() -> set[str] | None:
-    raw = (get_scoped_secret("AGENTYGG_ALLOWED", "") or "").strip()
-    if not raw:
-        return None
-    return {x.strip().lstrip("@").lower() for x in raw.split(",") if x.strip()}
-
-
 class AgentYggAdapter(BasePlatformAdapter):
     def __init__(self, config: Any, **kwargs: Any):
         super().__init__(config=config, platform=Platform(PLATFORM))
         self.client: AgentYggClient | None = None
         self.me: dict = {}
         self.conversations = Conversations()
-        self._allowed = _allowlist()
         self._task: asyncio.Task | None = None
         # conversation -> the message in its turn, the timer that frees it, what waits behind it
         self._busy: dict[str, str | None] = {}
@@ -79,12 +71,6 @@ class AgentYggAdapter(BasePlatformAdapter):
     @property
     def name(self) -> str:
         return "Agent'Ygg"
-
-    @property
-    def authorization_is_upstream(self) -> bool:
-        """Every sender was authenticated by Agent'Ygg (sign-ins, workspace membership) before
-        its message reached us; AGENTYGG_ALLOWED narrows who may reach this agent."""
-        return True
 
     # -- lifecycle ---------------------------------------------------------- #
 
@@ -211,21 +197,10 @@ class AgentYggAdapter(BasePlatformAdapter):
 
     # -- inbound ------------------------------------------------------------ #
 
-    def _may_reach_us(self, env: dict) -> bool:
-        sender = (env.get("from") or "").lower()
-        if self._allowed is None or sender == SYSTEM_ID:
-            return True
-        return sender in self._allowed
-
     async def _deliver(self, frame: dict) -> None:
         env = frame.get("envelope") or {}
         cid = env.get("conversation_id")
         if not cid:
-            return
-        if not self._may_reach_us(env):
-            logger.info(
-                "Agent'Ygg: %s is not in AGENTYGG_ALLOWED; message dropped", env.get("from")
-            )
             return
         self.conversations.woke(cid, env, (frame.get("from") or {}).get("label"))
         # One message per conversation at a time: given a second while a turn runs, Hermes

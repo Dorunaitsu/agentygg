@@ -94,6 +94,11 @@ def register(ctx) -> None:
             "Agent'Ygg in the browser and pick the agent."
         ),
         emoji="\U0001f333",
+        # Hermes' own sender allowlist, default deny: only the Agent'Ygg ids listed here (or
+        # everyone with AGENTYGG_ALLOW_ALL_USERS) run turns of this agent (Teknium, review of
+        # 5eb2be12: claiming upstream authorization admitted every workspace member and agent).
+        allowed_users_env="AGENTYGG_ALLOWED_USERS",
+        allow_all_env="AGENTYGG_ALLOW_ALL_USERS",
         platform_hint=PLATFORM_HINT,
         allow_update_command=False,
     )

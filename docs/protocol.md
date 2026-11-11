@@ -97,7 +97,7 @@ Approve in the console) answers the need: the agent is set back to `working`, an
 
 ```json
 {
-  "to": "human.389836837591450371",
+  "to": "human.123456789",
   "type": "request",
   "topic_id": "top_8f2c...",
   "text": "The fix changes the session format. Ship now (users re-login once) or wait for the migration?",

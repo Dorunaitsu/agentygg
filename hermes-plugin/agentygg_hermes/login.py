@@ -77,20 +77,22 @@ def allow_questions(
 
 
 QUESTIONS_PROMPT = (
-    "Receive your agent's requests in the chat you use with it (an approval, an email to send: "
-    "what only you can decide)? Recommended. [Y/n] "
+    "When another agent asks yours for something only you can decide (an approval, an email to "
+    "send, a purchase), your agent can ask you in the chat you already use with it (Telegram, "
+    "Discord...) and wait for your answer. Without this, it declines those requests. Allow it? "
+    "Recommended: y. [y/N] "
 )
 QUESTIONS_COMMAND = f"hermes config set {INJECTION_SETTING} true"
 
 
 def _ask_tty(question: str) -> bool:
-    """Yes unless the person says no; the recommended yes with nobody at the terminal."""
+    """Only an explicit yes; nobody at the terminal means no (Teknium, review of 5eb2be12)."""
     if not sys.stdin.isatty():
-        return True
+        return False
     try:
-        return input(question).strip().lower() not in ("n", "no", "non")
+        return input(question).strip().lower() in ("y", "yes", "o", "oui")
     except EOFError:
-        return True
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -125,7 +127,52 @@ def _status() -> int:
         return 1
     handle = str(me.get("handle") or me.get("agent_id") or "").lstrip("@")
     print(f'Connected as @{handle} in "{me.get("workspace_name") or me.get("workspace_id")}".')
+    _senders()
     return 0
+
+
+def _senders() -> None:
+    """Who may run turns of this agent (Hermes' allowlist, default deny), and the ids to pick from."""
+    import asyncio
+
+    from gateway.platforms._shared import get_scoped_secret
+
+    from .gateway_client import AgentYggClient, GatewayError, NotSignedIn
+
+    allowed = (get_scoped_secret("AGENTYGG_ALLOWED_USERS", "") or "").strip()
+    everyone = (get_scoped_secret("AGENTYGG_ALLOW_ALL_USERS", "") or "").strip().lower()
+    if everyone in ("1", "true", "yes", "on"):
+        print("Senders: everyone in the workspace (AGENTYGG_ALLOW_ALL_USERS).")
+    elif allowed:
+        print(f"Senders allowed (AGENTYGG_ALLOWED_USERS): {allowed}")
+        if "system.ygg" not in [x.strip() for x in allowed.split(",")]:
+            print(
+                "  system.ygg is missing: Agent'Ygg's own notices (a topic about to close, a "
+                "reminder) are refused until you add it."
+            )
+    else:
+        print(
+            "No sender allowed yet: Hermes refuses every message until AGENTYGG_ALLOWED_USERS lists "
+            "the Agent'Ygg ids that may write to this agent (comma-separated, in this profile's .env)."
+        )
+    try:
+        found = asyncio.run(AgentYggClient().directory())
+    except (GatewayError, NotSignedIn):
+        return
+    rows = [(p.get("id"), p.get("handle"), "person") for p in found.get("humans") or []]
+    rows += [
+        (a.get("id"), a.get("handle"), "agent")
+        for a in found.get("agents") or []
+        if not a.get("you")
+    ]
+    if rows:
+        print("Ids in this workspace:")
+        for rid, rhandle, kind in rows:
+            print(f"  {rid}  ({rhandle}, {kind})")
+    print(
+        'To let someone in: hermes config set AGENTYGG_ALLOWED_USERS "<ids, comma-separated>", '
+        "then restart the gateway."
+    )
 
 
 def run_cli(

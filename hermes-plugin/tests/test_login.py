@@ -9,7 +9,7 @@ import json
 import types
 
 import pytest
-from conftest import HERMES_CALLS, HERMES_HTTP
+from conftest import HERMES_CALLS, HERMES_HTTP, SECRETS
 
 from agentygg_hermes import gateway_client as gc
 from agentygg_hermes import login
@@ -94,12 +94,31 @@ def test_questions_fall_back_to_hermes_on_the_path(monkeypatch, tmp_path):
 
 def test_status_asks_agentygg_through_hermes(capsys):
     def network(method, url, body, headers):
+        if url.endswith("/v1/agent/directory"):
+            people = {"humans": [{"id": "human.1", "handle": "@ray"}]}
+            agents = [
+                {"id": "betty", "handle": "@betty", "you": True},
+                {"id": "codex", "handle": "@codex"},
+            ]
+            return 200, {}, json.dumps({**people, "agents": agents}).encode()
         assert url == "https://api.agentygg.com/v1/agent/me"
         return 200, {}, json.dumps({"handle": "@betty", "workspace_name": "Lab"}).encode()
 
     HERMES_HTTP["handler"] = network
     assert login.run_cli(types.SimpleNamespace(agentygg_cmd="status")) == 0
-    assert 'Connected as @betty in "Lab"' in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert 'Connected as @betty in "Lab"' in out
+    # default deny is said, with the ids to choose from (Teknium, review of 5eb2be12)
+    assert "No sender allowed yet" in out and "AGENTYGG_ALLOWED_USERS" in out
+    assert "human.1" in out and "codex" in out and "  betty  " not in out
+    SECRETS["AGENTYGG_ALLOWED_USERS"] = "human.1,codex"
+    login.run_cli(types.SimpleNamespace(agentygg_cmd="status"))
+    out = capsys.readouterr().out
+    assert "Senders allowed (AGENTYGG_ALLOWED_USERS): human.1,codex" in out
+    assert "system.ygg is missing" in out  # Agent'Ygg's own notices are refused without it
+    SECRETS["AGENTYGG_ALLOWED_USERS"] = "system.ygg, human.1"
+    login.run_cli(types.SimpleNamespace(agentygg_cmd="status"))
+    assert "system.ygg is missing" not in capsys.readouterr().out
     HERMES_HTTP["handler"] = None  # not signed in
     assert login.run_cli(types.SimpleNamespace(agentygg_cmd="status")) == 1
     assert "hermes auth add agentygg:agentygg" in capsys.readouterr().out
@@ -160,3 +179,19 @@ def test_hermes_refusals_become_clear_errors():
     with pytest.raises(gc.GatewayError) as e:
         asyncio.run(gc.AgentYggClient().me())
     assert e.value.status == 503  # out of reach: the adapter tries again
+
+
+def test_nobody_at_the_terminal_means_no_questions(monkeypatch):
+    """Teknium's review of 5eb2be12: only an explicit yes turns on allow_gateway_injection."""
+    monkeypatch.setattr(login.sys.stdin, "isatty", lambda: False)
+    assert login._ask_tty(login.QUESTIONS_PROMPT) is False
+    monkeypatch.setattr(login.sys.stdin, "isatty", lambda: True)
+
+    def eof(_prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", eof)
+    assert login._ask_tty(login.QUESTIONS_PROMPT) is False
+    for answer, expected in (("", False), ("n", False), ("y", True), ("yes", True), ("oui", True)):
+        monkeypatch.setattr("builtins.input", lambda _p, a=answer: a)
+        assert login._ask_tty(login.QUESTIONS_PROMPT) is expected, answer
