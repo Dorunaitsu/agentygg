@@ -104,6 +104,11 @@ def setup_cli(parser) -> None:
     sub = parser.add_subparsers(dest="agentygg_cmd")
     p = sub.add_parser("login", help="connect this Hermes to an Agent'Ygg agent (in a browser)")
     p.add_argument(
+        "--device",
+        action="store_true",
+        help="sign in with a link and a code, for a machine without a browser (default over SSH)",
+    )
+    p.add_argument(
         "--no-questions",
         action="store_true",
         help="do not let the agent bring you its requests in your chat (default: it does)",
@@ -252,11 +257,17 @@ def run_cli(
     cmd = getattr(args, "agentygg_cmd", None) or "status"
     if cmd == "login":
         questions = False if getattr(args, "no_questions", False) else ask(QUESTIONS_PROMPT)
+        device = getattr(args, "device", False) or bool(os.environ.get("SSH_CONNECTION"))
         print(
-            "Sign in to Agent'Ygg in the browser and pick the agent this Hermes will be "
-            "(Hermes waits 3 minutes for it; run the command again if it times out)."
+            "Sign in to Agent'Ygg and pick the agent this Hermes will be "
+            + (
+                "(open the link Hermes prints on any device)."
+                if device
+                else "(Hermes waits 3 minutes for it; run the command again if it times out)."
+            )
         )
-        ok, why = _run_hermes(["auth", "add", AUTH_KEY], run=run, capture=False)
+        sign_in = ["auth", "add", AUTH_KEY] + (["--device"] if device else [])
+        ok, why = _run_hermes(sign_in, run=run, capture=False)
         if not ok:
             print(
                 f"Not connected ({why}). Run it yourself, in a terminal: hermes auth add {AUTH_KEY}"

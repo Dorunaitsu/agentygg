@@ -37,6 +37,7 @@ def _fake_hermes(tmp_path):
 def test_login_asks_first_then_runs_hermes_own_sign_in(
     tmp_path, monkeypatch, capsys, answer, flag, turned_on, says
 ):
+    monkeypatch.delenv("SSH_CONNECTION", raising=False)
     hermes = _fake_hermes(tmp_path)
     monkeypatch.setattr(login.sys, "argv", [str(hermes), "-p", "work", "agentygg", "login"])
     ran, asked = [], []
@@ -63,6 +64,34 @@ def test_login_asks_first_then_runs_hermes_own_sign_in(
             "true",
         ]
     assert ("Recommended" in asked[0]) if not flag else asked == []
+
+
+@pytest.mark.parametrize(
+    ("flag", "ssh", "device"),
+    [(True, False, True), (False, True, True), (False, False, False)],
+)
+def test_login_signs_in_with_a_code_on_request_or_over_ssh(
+    tmp_path, monkeypatch, capsys, flag, ssh, device
+):
+    """Experimental (hermes-agent#152050): `--device`, or a session over SSH, asks Hermes for a
+    link and a code instead of a browser on this machine."""
+    hermes = _fake_hermes(tmp_path)
+    monkeypatch.setattr(login.sys, "argv", [str(hermes), "agentygg", "login"])
+    if ssh:
+        monkeypatch.setenv("SSH_CONNECTION", "10.0.0.2 50000 10.0.0.1 22")
+    else:
+        monkeypatch.delenv("SSH_CONNECTION", raising=False)
+    ran = []
+    args = types.SimpleNamespace(agentygg_cmd="login", no_questions=True, device=flag)
+    login.run_cli(
+        args, ask=lambda q: True, run=lambda cmd, **kw: ran.append(cmd) or _hermes_ok(cmd)
+    )
+    assert (
+        ran[0][-3:] == ["auth", "add", "agentygg:agentygg"]
+        if not device
+        else (ran[0][-4:] == ["auth", "add", "agentygg:agentygg", "--device"])
+    )
+    assert ("link" in capsys.readouterr().out) is device
 
 
 def test_a_failed_sign_in_says_what_to_run(tmp_path, monkeypatch, capsys):

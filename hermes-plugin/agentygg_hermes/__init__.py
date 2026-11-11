@@ -43,12 +43,10 @@ def validate_config(config) -> bool:
 
 
 def is_connected(config) -> bool:
-    """Set up once the profile names Agent'Ygg's sign-in client (asked by `hermes plugins
-    install`). Whether the person signed in (`hermes auth add agentygg:agentygg`) is Hermes'
-    to know: without it the platform stops at connect with that command to run."""
-    from gateway.platforms._shared import env_is_connected
-
-    return env_is_connected("AGENTYGG_CLIENT_ID")(config)
+    """Always set up: the public client id has a default (client_id_default), and whether the
+    person signed in is Hermes' to know. Until they do (`/login agentygg` from their app), the
+    platform stops at connect with that hint and connects at the gateway's next attempt."""
+    return True
 
 
 # No custom setup wizard: Hermes offers no public API to read or write settings from one
@@ -90,8 +88,8 @@ def register(ctx) -> None:
         is_connected=is_connected,
         required_env=[],
         install_hint=(
-            "No extra packages needed. Run `hermes agentygg login` in a terminal: sign in to "
-            "Agent'Ygg in the browser and pick the agent."
+            "No extra packages needed. Send /login agentygg to your agent in a direct message "
+            "(or run hermes agentygg login): open the link, sign in to Agent'Ygg, pick the agent."
         ),
         emoji="\U0001f333",
         # Hermes' own sender allowlist, default deny: only the Agent'Ygg ids listed here (or

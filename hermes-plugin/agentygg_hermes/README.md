@@ -37,39 +37,103 @@ without you.
 
 ## Install
 
-> **Needs a Hermes fix to sign in.** Hermes 0.23.0 refuses a platform plugin's own OAuth client
-> variable ([issue #151208](https://github.com/NousResearch/hermes-agent/issues/151208), fixed by
-> [PR #151209](https://github.com/NousResearch/hermes-agent/pull/151209) or
-> [#142080](https://github.com/NousResearch/hermes-agent/pull/142080)). Until a release includes
-> it, `hermes auth add agentygg:agentygg` fails with "AGENTYGG_CLIENT_ID is a variable Hermes
-> uses itself". Everything else is ready.
+> **Experimental build (`1.1.0-experimental`).** It lets you connect the plugin from your
+> messaging app with `/login agentygg`, a link and a code, no terminal and no setting to enter.
+> It relies on two Hermes changes that are not released yet, so it runs only on a Hermes that
+> includes them. The stable plugin, listed in the Hermes catalog, is on the `main` branch.
 
-1. Install and enable the plugin:
-   ```bash
-   hermes plugins install Dorunaitsu/agentygg#hermes-plugin/agentygg_hermes
-   hermes plugins enable agentygg
-   ```
-   The install asks for `AGENTYGG_CLIENT_ID`: enter `hermes` (Agent'Ygg's public sign-in client
-   for Hermes, not a secret). It also asks for `AGENTYGG_ALLOWED_USERS`, **required**: the
-   Agent'Ygg ids that may write to this agent (see "Who can write to your agent" below). You can
-   leave it empty at install and fill it in once signed in.
-2. Connect it to Agent'Ygg, from a terminal on the machine Hermes runs on:
-   ```bash
-   hermes agentygg login
-   ```
-   It first asks whether your agent may bring you its requests in the chat you use with it (an
-   approval, an email to send: what only you can decide). Yes is recommended, but only an
-   explicit yes turns it on (with nobody at the terminal, the answer is no); without it, the
-   agent declines what needs you. Then Hermes' own sign-in for the plugin
-   (`hermes auth add agentygg:agentygg`) opens your browser on Agent'Ygg: sign in (or create a
-   free account), then pick the workspace and the agent this Hermes will be, or create one.
-   Hermes keeps the sign-in and refreshes it; the plugin never sees a token. Once signed in, it
-   asks who may write to the agent: only the ones you pick from its workspace (the default, listed
-   by number), or everyone in the workspace. A list already set is kept, and with nobody at the
-   terminal nothing changes (every sender stays refused). On a remote machine,
-   Hermes prints how to tunnel its local callback over SSH.
-3. Restart the gateway from a terminal outside Hermes: `hermes gateway restart`. The log shows
-   `Agent'Ygg: connected as @your-agent`.
+### 1. A Hermes with the changes this build needs
+
+| Hermes PR | Why this build needs it |
+|---|---|
+| [#151209](https://github.com/NousResearch/hermes-agent/pull/151209) | A platform plugin may use its own OAuth client variable, with a public default (`client_id_default`). Without it no sign-in works at all. |
+| [#154120](https://github.com/NousResearch/hermes-agent/pull/154120) (issue [#152050](https://github.com/NousResearch/hermes-agent/issues/152050)) | Sign in a plugin with a link and a code: `/login agentygg` in your direct conversation with the agent, or `hermes auth add agentygg:agentygg --device` in a terminal. |
+
+Build it from source, on today's `main` with both PRs merged in:
+
+```bash
+git clone https://github.com/NousResearch/hermes-agent.git hermes-agentygg
+cd hermes-agentygg
+git fetch origin pull/151209/head:pr-151209 pull/154120/head:pr-154120
+git merge --no-edit pr-151209
+git merge --no-edit pr-154120   # stops on one conflict, in hermes_cli/plugin_oauth.py
+```
+
+Both PRs add an optional field to the same class, so Git stops once. In
+`hermes_cli/plugin_oauth.py`, replace each of the two conflict blocks (from `<<<<<<<` to
+`>>>>>>>`) with both sides kept:
+
+```python
+    client_id_default: str = ""
+    device_authorization_url: str = ""
+
+    @property
+    def fingerprint(self) -> str:
+        """Hash of every field: a grant is used only with the entry it was made for. Opt-in fields left
+        empty are left out, so grants made before they existed stay valid."""
+        fields = asdict(self)
+        for optional in ("client_id_default", "device_authorization_url"):
+            if not fields[optional]:
+                del fields[optional]
+```
+
+and, lower down in `_client()`:
+
+```python
+        client_id_default=entry.get("client_id_default", ""),
+        authorize_params=tuple(sorted((entry.get("authorize_params") or {}).items())),
+        device_authorization_url=entry.get("device_authorization_url") or "")
+```
+
+One more line, so the device sign-in also uses the public default: in `_client_form()`, give the
+client id read the same default as the token request:
+
+```python
+    form = {"client_id": _env(client.client_id_env, "oauth_client_id_missing", key,
+                              default=client.client_id_default)}
+```
+
+Then `git add hermes_cli/plugin_oauth.py && git commit --no-edit`, and install Hermes from that
+checkout the way you usually install it from source. Check it with
+`uv run pytest tests/hermes_cli/test_plugin_oauth.py tests/gateway/test_login_command.py`
+(`uv sync --group test --group dev` first). Once both PRs ship in a Hermes release, none of this is
+needed and this build becomes the stable plugin.
+
+### 2. The plugin
+
+```bash
+hermes plugins install Dorunaitsu/agentygg#hermes-plugin/agentygg_hermes --ref <latest commit of the experimental branch>
+hermes plugins enable agentygg
+hermes gateway restart
+```
+
+`--ref` takes a full commit id: the branch's latest is
+`git ls-remote https://github.com/Dorunaitsu/agentygg refs/heads/experimental`.
+
+The install asks for `AGENTYGG_ALLOWED_USERS`, **required**: the Agent'Ygg ids that may write to
+this agent (see "Who can write to your agent" below). You can leave it empty and fill it in once
+signed in. `AGENTYGG_CLIENT_ID` is optional now (the default, `hermes`, is Agent'Ygg's public
+sign-in client).
+
+### 3. Connect it
+
+In your direct conversation with your agent (Telegram, Discord, Slack...), send:
+
+```
+/login agentygg
+```
+
+Hermes, not the agent, answers with a link and a short code. Open the link on any device, sign
+in to Agent'Ygg (or create a free account), check the code, then pick the workspace and the agent
+this Hermes will be, or create one. Hermes keeps the sign-in and refreshes it; the plugin never
+sees a token. The platform connects by itself at the gateway's next attempt: no restart. Only an
+operator of this Hermes can start it, and only from a direct message.
+
+From a terminal instead, `hermes agentygg login` asks whether your agent may bring you its
+requests, then signs in (with `--device`, or over SSH, as a link and a code; otherwise in the
+browser), then asks who may write to the agent. To let your agent bring you its requests (an
+approval, an email to send) when you used `/login`:
+`hermes config set plugins.entries.agentygg.allow_gateway_injection true` (recommended).
 
 ### Who can write to your agent
 
@@ -110,15 +174,15 @@ Proposed or open in Hermes; each one makes the plugin better as soon as it lands
 
 | Hermes PR or issue | What it does for this plugin |
 |---|---|
-| [#151209](https://github.com/NousResearch/hermes-agent/pull/151209) (or [#142080](https://github.com/NousResearch/hermes-agent/pull/142080)), fixes [#151208](https://github.com/NousResearch/hermes-agent/issues/151208) | Lets a platform plugin use its own OAuth client variable. **Needed to sign in at all.** #151209 also adds `client_id_default`, which would drop the `AGENTYGG_CLIENT_ID` prompt at install. |
-| [#152050](https://github.com/NousResearch/hermes-agent/issues/152050): device-code sign-in for plugin OAuth | Connect the plugin from your messaging app with `/login agentygg:agentygg`, a link and a code, no terminal. Today the first sign-in needs a terminal on the Hermes host. |
+| [#151209](https://github.com/NousResearch/hermes-agent/pull/151209) (or [#142080](https://github.com/NousResearch/hermes-agent/pull/142080)), fixes [#151208](https://github.com/NousResearch/hermes-agent/issues/151208) | Lets a platform plugin use its own OAuth client variable, with a public default. **This build needs #151209.** |
+| [#154120](https://github.com/NousResearch/hermes-agent/pull/154120), issue [#152050](https://github.com/NousResearch/hermes-agent/issues/152050): device-code sign-in for plugin OAuth | Connect the plugin from your messaging app with `/login agentygg`, a link and a code, no terminal. **This build needs it.** |
 | [#96179](https://github.com/NousResearch/hermes-agent/pull/96179) | Reports gateway dispatch outcomes: `ask_human` would know your question really reached you (today Hermes says yes before admitting it). |
 
 ## Settings
 
 | Variable | Required | What it does |
 |---|---|---|
-| `AGENTYGG_CLIENT_ID` | yes | `hermes`: the sign-in client Hermes uses for Agent'Ygg (asked at install). |
+| `AGENTYGG_CLIENT_ID` | no | Agent'Ygg's public sign-in client for Hermes (default `hermes`; only for a self-hosted Agent'Ygg). |
 | `AGENTYGG_ALLOWED_USERS` | yes | The Agent'Ygg ids that may write to this agent, comma-separated. Empty: Hermes refuses every sender. |
 | `AGENTYGG_ALLOW_ALL_USERS` | no | `true`: every member and agent of the workspace may write to it (testing). |
 | `AGENTYGG_HUMAN_PLATFORM` | no | Where questions for you go (`telegram`, `discord`...). Empty: the app you last wrote to the agent in. |

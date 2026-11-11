@@ -627,20 +627,18 @@ def test_register_declares_one_tool_and_the_platform():
     assert "provides_tools:\n  - ygg" in open(manifest).read()
 
 
-def test_the_tool_is_offered_once_the_sign_in_client_is_set():
-    assert tools.configured() is False and agentygg.is_connected(None) is False
-    SECRETS["AGENTYGG_KEY"] = _key()  # a key is no way in (sign-in only)
-    assert tools.configured() is False
-    SECRETS["AGENTYGG_CLIENT_ID"] = "hermes"  # asked by hermes plugins install
+def test_the_tool_and_platform_need_no_setting_with_the_client_default():
+    """Experimental: the public client id has a default (client_id_default, hermes-agent#151209),
+    so nothing gates the tool or the platform; the sign-in itself is Hermes' to check."""
     assert tools.configured() is True and agentygg.is_connected(None) is True
 
 
-async def test_without_a_sign_in_the_platform_stops_with_a_clear_reason():
-    SECRETS["AGENTYGG_CLIENT_ID"] = "hermes"
+async def test_without_a_sign_in_the_platform_says_how_and_retries():
     a = ad.AgentYggAdapter(config=None)
     assert await a.connect() is False  # Hermes holds no grant for the plugin yet
-    assert a.fatal[0] == "not_connected" and a.fatal[2] is False
-    assert "hermes auth add agentygg:agentygg" in a.fatal[1]
+    # retryable: once the person sends /login agentygg, the next attempt connects, no restart
+    assert a.fatal[0] == "not_connected" and a.fatal[2] is True
+    assert "/login agentygg" in a.fatal[1] and "hermes auth add agentygg:agentygg" in a.fatal[1]
 
 
 async def test_a_failed_connect_writes_its_reason_to_the_gateway_log(caplog):

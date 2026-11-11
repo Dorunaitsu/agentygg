@@ -22,9 +22,11 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 DEFAULT_API = "https://api.agentygg.com"
-VERSION = "1.0.7"
+VERSION = "1.1.0-experimental"
 OAUTH_ID = "agentygg"  # the plugin.yaml `oauth:` entry: `hermes auth add agentygg:agentygg`
 SIGN_IN = f"hermes auth add agentygg:{OAUTH_ID}"
+# What the person does from their messaging app (NousResearch/hermes-agent#152050).
+SIGN_IN_FROM_CHAT = "/login agentygg"
 TIMEOUT_S = 40.0
 POLL_WAIT_S = 25  # the server holds a poll open this long waiting for a wake
 
@@ -63,7 +65,10 @@ async def hermes_requester(
     try:
         r = await asyncio.to_thread(_call_hermes, method, url, body, headers, timeout)
     except ProviderNotSignedIn as e:
-        raise NotSignedIn(f"{e} (Agent'Ygg: run `{SIGN_IN}` in a terminal)") from None
+        raise NotSignedIn(
+            f"{e} (Agent'Ygg: your person sends `{SIGN_IN_FROM_CHAT}` in their direct conversation "
+            f"with you, or runs `{SIGN_IN}` in a terminal)"
+        ) from None
     except PermissionError as e:
         raise NotSignedIn(str(e)) from None
     except Exception as e:  # noqa: BLE001 - Hermes' AuthError, or the network

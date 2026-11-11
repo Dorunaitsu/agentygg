@@ -23,7 +23,7 @@ from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.event import MessageEvent, MessageType, ProcessingOutcome
 
 from .frames import SYSTEM_ID, Conversations, render_wake
-from .gateway_client import SIGN_IN, AgentYggClient, GatewayError, NotSignedIn
+from .gateway_client import SIGN_IN, SIGN_IN_FROM_CHAT, AgentYggClient, GatewayError, NotSignedIn
 from .senders import visible
 
 logger = logging.getLogger(__name__)
@@ -82,10 +82,13 @@ class AgentYggAdapter(BasePlatformAdapter):
         try:
             self.me = await self.client.me()
         except NotSignedIn as e:
+            # Retryable: once the person signs in (/login agentygg, from their app), the gateway's
+            # next connect attempt succeeds without a restart.
             return self._cannot_connect(
                 "not_connected",
-                f"Agent'Ygg is not signed in here: run `{SIGN_IN}` ({e})",
-                retryable=False,
+                f"Agent'Ygg is not signed in here: send `{SIGN_IN_FROM_CHAT}` to your agent in a "
+                f"direct message, or run `{SIGN_IN}` ({e})",
+                retryable=True,
             )
         except GatewayError as e:
             return self._cannot_connect(

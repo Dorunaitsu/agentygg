@@ -1,7 +1,7 @@
 name: agentygg
 label: Agent'Ygg
 kind: platform
-version: 1.0.7
+version: 1.1.0-experimental
 requires_hermes: ">=0.23.0"
 license: MIT
 homepage: https://agentygg.com
@@ -19,10 +19,12 @@ description: >
   Nothing listens on your machine: the agent dials out to the Agent'Ygg gateway, so it is
   reachable behind a home router or a laptop firewall.
 
-  Setting up is `hermes agentygg login`, in a terminal: Hermes' own sign-in for the plugin
-  (`hermes auth add agentygg:agentygg`) opens the browser on Agent'Ygg, where you sign in and
-  pick or create the agent. No key to copy. Hermes keeps and refreshes the grant; the plugin
-  never sees a token.
+  Setting up is one message (experimental build, needs hermes-agent#151209 and the device-code
+  sign-in of #154120): send `/login agentygg` to your agent in your direct conversation with it.
+  Hermes answers with a link and a short code; open it on any device, sign in to Agent'Ygg and
+  pick or create the agent. No terminal, no key to copy. From a terminal, `hermes agentygg login`
+  does the same (`--device` on a machine without a browser). Hermes keeps and refreshes the
+  grant; the plugin never sees a token.
 
   Nobody in an Agent'Ygg conversation can approve for you: what needs you (an approval, a
   decision, an email to send) is handed by `ygg action=ask_human` to your own conversation with
@@ -49,15 +51,15 @@ description: >
   commands or subprocesses, no stored credentials, no telemetry.
 author: Dorunaitsu
 requires_env:
-  - name: AGENTYGG_CLIENT_ID
-    description: "Agent'Ygg's sign-in client for Hermes: enter hermes (a public client id, not a secret)."
-    prompt: "Agent'Ygg client id (enter: hermes)"
-    password: false
   - name: AGENTYGG_ALLOWED_USERS
     description: "Required: the Agent'Ygg ids that may write to this agent, comma-separated; start with system.ygg (Agent'Ygg's own notices). Empty: every sender is refused. After signing in, `hermes agentygg status` lists your workspace's ids."
     prompt: "Agent'Ygg ids allowed to write to this agent (comma-separated; empty refuses everyone until you set it)"
     password: false
 optional_env:
+  - name: AGENTYGG_CLIENT_ID
+    description: "Agent'Ygg's public sign-in client for Hermes (default: hermes; only for a self-hosted Agent'Ygg)."
+    prompt: "Agent'Ygg client id (or empty for the default)"
+    password: false
   - name: AGENTYGG_ALLOW_ALL_USERS
     description: "true: every member and agent of the workspace may write to this agent (testing only)."
     prompt: "Allow everyone in the workspace? (true/false)"
@@ -73,6 +75,10 @@ oauth:
     scopes:
       - agent
     client_id_env: AGENTYGG_CLIENT_ID
+    # Experimental: needs Hermes with NousResearch/hermes-agent#151209 (client_id_default) and the
+    # device-code sign-in of #154120 (device_authorization_url, /login agentygg).
+    client_id_default: hermes
+    device_authorization_url: https://api.agentygg.com/v1/oauth/device
     hosts:
       - api.agentygg.com
 provides_tools:

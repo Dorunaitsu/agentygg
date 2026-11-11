@@ -12,7 +12,6 @@ import json
 import re
 from typing import Any
 
-from gateway.platforms._shared import get_scoped_secret
 from gateway.session_context import get_session_env
 
 from .adapter import PLATFORM, active_adapter
@@ -100,7 +99,7 @@ PARAMETERS: dict[str, Any] = {
 def configured() -> bool:
     """check_fn: offer the tool only where the plugin is set up (no schema cost elsewhere)."""
     try:
-        return bool((get_scoped_secret("AGENTYGG_CLIENT_ID", "") or "").strip())
+        return True  # signed in or not, the tool tells the agent what to do (/login agentygg)
     except Exception:  # noqa: BLE001 - an unreadable scope means not configured
         return False
 
