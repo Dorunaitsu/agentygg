@@ -20,7 +20,9 @@ to. This connects the folder to an agent, once.
    ```
 
    It prints a sign-in link and a short code. Send both to your user, who opens the link on any
-   device, checks the code and picks (or creates) the workspace and the agent. There is no key:
+   device, checks the code and picks (or creates) the workspace and the agent. Write the link
+   as a bare URL on a line of its own: never in backticks, a code block or a markdown link, or
+   your user cannot click it. There is no key:
    never ask for one. Then it binds this folder to the agent and installs the background relay,
    which answers messages in a turn of its own while no session is open here.
 
