@@ -22,6 +22,7 @@ import contextlib
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from agentygg import __version__, store
@@ -424,7 +425,10 @@ def cmd_setup(args) -> None:
         )
         for line in done + removed:
             print(f"  {line}")
-        print("Start a new Claude Code session here (`claude --continue` keeps the conversation).")
+        print(
+            "An open Claude Code session here picks it up within seconds (tools and live "
+            "messages); if not, start a new one (`claude --continue` keeps the conversation)."
+        )
         return
     # The cross-harness skills location (agentskills.io): OpenClaw, Codex and others read it.
     _write_skill(root / ".agents" / "skills" / "agentygg")
@@ -639,6 +643,27 @@ def _unwire_claude_project(root: Path) -> list[str]:
     return gone
 
 
+BIND_POLL_S = 10.0
+
+
+def _here_identity(wait: bool, poll_s: float = BIND_POLL_S, sleep=time.sleep):
+    """The identity this folder belongs to; with `wait`, poll until there is one (printing
+    nothing: in a folder nobody connects, this just sleeps until the session ends)."""
+    while True:
+        found = store.pointer_for()
+        if found:
+            try:
+                return store.load(found[0])
+            except LookupError:
+                pass  # the pointer is written before the sign-in is saved: look again
+        if not wait:
+            return None
+        try:
+            sleep(poll_s)
+        except KeyboardInterrupt:
+            raise SystemExit(0) from None
+
+
 def cmd_listen(args) -> None:
     if os.environ.get("YGG_RELAY"):
         _fail(
@@ -647,17 +672,24 @@ def cmd_listen(args) -> None:
         )
     from agentygg.listen import follow, listen, listen_nonce
 
+    if args.follow:
+        import signal
+
+        # The session ending stops the monitor with SIGTERM: hand the pings back to the relay at
+        # once instead of after the listening mark expires.
+        def _term(*_):
+            raise KeyboardInterrupt
+
+        with contextlib.suppress(ValueError, OSError):
+            signal.signal(signal.SIGTERM, _term)
     if args.here:
         # Only the agent this folder belongs to (its `.agentygg` pointer), never "the only agent
         # on this machine": the Claude Code plugin starts this in every session, and a folder
-        # nobody connected must not take that agent's messages. Not bound: leave quietly.
-        found = store.pointer_for()
-        if not found:
+        # nobody connected must not take that agent's messages. Not bound: leave quietly, or
+        # with --follow wait quietly for the folder to be connected (no restart needed then).
+        ident = _here_identity(wait=args.follow)
+        if ident is None:
             raise SystemExit(0)
-        try:
-            ident = store.load(found[0])
-        except LookupError:
-            raise SystemExit(0) from None
     else:
         ident = _identity(args)
     if not args.follow:
@@ -678,16 +710,6 @@ def cmd_listen(args) -> None:
         finally:
             await gw.close()
 
-    if args.follow:
-        import signal
-
-        # The session ending stops the monitor with SIGTERM: hand the pings back to the relay at
-        # once instead of after the listening mark expires.
-        def _term(*_):
-            raise KeyboardInterrupt
-
-        with contextlib.suppress(ValueError, OSError):
-            signal.signal(signal.SIGTERM, _term)
     try:
         code = asyncio.run(go())
     except KeyboardInterrupt:

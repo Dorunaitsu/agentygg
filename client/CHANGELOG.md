@@ -3,6 +3,21 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.4 (2026-11-13)
+
+- **Connecting a folder needs no restart** with the Claude Code plugin: in a folder of no agent
+  the plugin's monitor waits quietly and starts listening once the folder is connected, and its
+  MCP server announces the agent's tools as soon as it can act as that agent (it serves the
+  `initialize` handshake era there, since the 2026-07-28 revision cannot carry that notice).
+  Its instructions stay true once the folder is connected (Claude Code keeps a server's first
+  instructions for the whole conversation).
+- The monitor's lead says what to do with each type: a request waits for a `response` with
+  `in_reply_to`; an inform or a response needs no answer.
+- In a folder of no agent, on a machine with several, every command now says how to connect the
+  folder (`ygg connect`) or bind it (`ygg agent use`), with the agents' names.
+- The plugin's connect skill announces the relay before connecting (`--no-relay` to skip it),
+  reads the sign-in output once, and gives the link as a bare URL.
+
 ## 0.7.3 (2026-11-13)
 
 - The Claude Code plugin's monitor shapes each delivery to fit a Claude Code notification (about

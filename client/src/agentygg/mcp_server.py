@@ -24,7 +24,7 @@ import sys
 import httpx2
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
-from mcp.server.lowlevel import Server
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
 from mcp_types import CallToolResult, ListToolsResult, TextContent
 
@@ -124,11 +124,17 @@ PLUGIN_LIVE_TEXT = (
     "message arrives cut, with a line saying so: read it whole with ygg_conversation before "
     "answering."
 )
+# Told to the model in a folder of no agent. Claude Code keeps a server's first instructions for
+# the whole conversation (even across `claude --continue`), so this stays true once the folder is
+# connected (test-agent, 2026-11-13): it never says "there are no tools here".
 NOT_CONNECTED_TEXT = (
-    "Agent'Ygg (the agentygg plugin) is installed, but this folder is not connected to an agent, "
-    "so there are no Agent'Ygg tools here. If the user asks to connect this project to "
-    "Agent'Ygg, use the agentygg connect skill."
+    "Agent'Ygg (the agentygg plugin): its tools act as the agent this project folder belongs to. "
+    "While the folder belongs to no agent there are none; if the user asks to connect this "
+    "project to Agent'Ygg, use the agentygg connect skill. Once it is connected, the tools appear "
+    "by themselves; read the protocol once with `ygg skill` before using them."
 )
+# How often a server started in a folder of no agent looks for the folder's `.agentygg`.
+BIND_POLL_S = 5.0
 
 
 def follow_listener(gw: Gateway, http: httpx2.AsyncClient) -> None:
@@ -166,6 +172,90 @@ async def serve_empty(instructions: str) -> None:
     )
     async with stdio_server() as (read, write):
         await server.run(read, write, server.create_initialization_options())
+
+
+def _serve_handshake_only() -> None:
+    """Make this process's MCP server answer only the `initialize` handshake era."""
+    try:
+        from mcp.server import runner
+
+        runner._has_modern_envelope = lambda _params: False
+    except (ImportError, AttributeError):  # another SDK layout: the tools still come on restart
+        pass
+
+
+async def serve_unbound(poll_s: float = BIND_POLL_S) -> None:
+    """The plugin's server in a folder that belongs to no agent yet: no tools, and it watches for
+    the folder to be connected (`ygg connect --plugin`). Then it connects as that agent and tells
+    the client its tools changed, so they appear without restarting the session."""
+    state: dict = {"session": None, "remote": None, "gw": None, "http": None}
+    stop = asyncio.Event()
+
+    async def list_tools(ctx, _params):
+        state["session"] = getattr(ctx, "session", None) or state["session"]
+        if state["remote"] is None:
+            return ListToolsResult(tools=[])
+        return await state["remote"].list_tools()
+
+    async def call_tool(_ctx, params):
+        if state["remote"] is None:
+            return _error(
+                "This folder is not connected to an Agent'Ygg agent yet: use the agentygg "
+                "connect skill."
+            )
+        follow_listener(state["gw"], state["http"])
+        return await call_retrying(
+            lambda: state["remote"].call_tool(params.name, params.arguments or {})
+        )
+
+    async def watch() -> None:
+        # The remote connection is opened and closed in this one task (anyio requires it).
+        async with contextlib.AsyncExitStack() as stack:
+            while state["remote"] is None and not stop.is_set():
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(stop.wait(), poll_s)
+                if stop.is_set():
+                    return
+                ident = plugin_identity()
+                if ident is None:
+                    continue
+                gw = Gateway(ident)
+                try:
+                    remote, http = await _connect(stack, gw)
+                except ConnectionError:
+                    continue  # signed out or offline: try again next round
+                state.update(gw=gw, remote=remote, http=http)
+                if state["session"] is not None:
+                    try:
+                        await state["session"].send_tool_list_changed()
+                    except Exception as e:  # noqa: BLE001 - the tools still answer when asked
+                        print(f"ygg mcp: could not announce the tools: {e}", file=sys.stderr)
+            await stop.wait()
+
+    # Announcing the tools later needs a notification outside any request, which the 2026-07-28
+    # protocol revision cannot carry (measured 2026-11-13: delivered on the initialize handshake,
+    # never on 2026-07-28). So this server serves the handshake era only: a client opening with
+    # 2026-07-28 is refused and falls back to `initialize`, as with any older server.
+    _serve_handshake_only()
+    server = Server(
+        "agentygg",
+        version=__version__,
+        instructions=NOT_CONNECTED_TEXT,
+        on_list_tools=list_tools,
+        on_call_tool=call_tool,
+    )
+    watcher = asyncio.create_task(watch())
+    try:
+        async with stdio_server() as (read, write):
+            await server.run(
+                read,
+                write,
+                server.create_initialization_options(NotificationOptions(tools_changed=True)),
+            )
+    finally:
+        stop.set()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(watcher, 5)
 
 
 async def serve(identity: store.Identity, plugin: bool = False) -> None:
@@ -227,7 +317,7 @@ def run(agent_id: str | None = None, plugin: bool = False) -> None:
             return
         found = plugin_identity()
         if found is None:
-            asyncio.run(serve_empty(NOT_CONNECTED_TEXT))
+            asyncio.run(serve_unbound())
             return
         identity = found
     else:

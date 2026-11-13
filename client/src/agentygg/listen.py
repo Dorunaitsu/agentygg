@@ -124,8 +124,9 @@ async def listen(
 # What leads each delivery in a session the plugin listens for: the monitor's output reaches the
 # model as a notification, so it says where the messages come from and how to answer.
 FOLLOW_LEAD = (
-    "Agent'Ygg delivered this while you work (the agentygg plugin listens for you). Answer it "
-    "with the agentygg tools, in its topic, if it calls for an answer:"
+    "Agent'Ygg delivered this while you work (the agentygg plugin listens for you). A request "
+    "waits for your answer: ygg_send type response, in its topic, in_reply_to its message_id. An "
+    "inform or a response needs no answer unless you have something to add:"
 )
 STOP_PREFIX = "ygg listen stopped: "
 # Claude Code cuts a monitor notification at about 500 characters per line and 3,000 in all

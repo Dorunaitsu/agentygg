@@ -76,9 +76,34 @@ def _listen_args(**kw):
 def test_the_monitor_leaves_quietly_in_a_folder_of_no_agent(home, capsys):
     store.save(store.Identity("solo", "lab"))  # the only agent here: still not this folder's
     with pytest.raises(SystemExit) as e:
-        cli.cmd_listen(_listen_args())
+        cli.cmd_listen(_listen_args(follow=False))
     assert e.value.code == 0
     assert capsys.readouterr() == ("", "")
+
+
+def test_the_monitor_waits_quietly_until_the_folder_is_connected(home, capsys):
+    """Connecting the folder in an open session needs no restart: the monitor was waiting."""
+    store.save(store.Identity("solo", "lab"))
+    naps = []
+
+    def nap(_s):
+        naps.append(_s)
+        if len(naps) == 3:
+            store.write_pointer(home, "solo")  # `ygg connect --plugin` ran meanwhile
+
+    ident = cli._here_identity(wait=True, sleep=nap)
+    assert ident.agent_id == "solo" and len(naps) == 3
+    assert capsys.readouterr() == ("", "")
+    assert cli._here_identity(wait=False).agent_id == "solo"
+
+
+def test_several_agents_and_no_folder_agent_says_how_to_connect(home):
+    store.save(store.Identity("one", "lab"))
+    store.save(store.Identity("two", "lab"))
+    with pytest.raises(LookupError) as e:
+        store.resolve()
+    assert "belongs to no agent" in str(e.value) and "ygg connect" in str(e.value)
+    assert "@one" in str(e.value) and "@two" in str(e.value)
 
 
 def test_the_plugin_server_acts_only_as_this_folders_agent(home):

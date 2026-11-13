@@ -301,8 +301,10 @@ def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
         elif not ids:
             raise LookupError("no agent on this machine yet: run `ygg connect`")
         else:
+            names = ", ".join(f"@{i}" for i in ids)
             raise LookupError(
-                "several agents on this machine: pick one with --agent, or run "
-                "`ygg agent use <id>` in this directory"
+                f"this folder belongs to no agent, and this machine has several ({names}). "
+                "Connect this folder with `ygg connect` (sign in, then pick or create the "
+                "agent), bind it to one of them with `ygg agent use <id>`, or pass --agent <id>"
             )
     return load(agent_id)
