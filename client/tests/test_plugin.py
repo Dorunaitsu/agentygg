@@ -1,0 +1,119 @@
+"""The Claude Code plugin (2026-11-13): its monitor keeps listening for the whole session
+(`ygg listen --follow --here`), its MCP server acts only as the agent this folder belongs to, and
+`ygg setup claude --plugin` leaves the MCP server and the skill to the plugin."""
+
+import asyncio
+import json
+import types
+
+import pytest
+from test_listen import FakeGw, _frame
+
+from agentygg import cli, mcp_server, store
+from agentygg import listen as lst
+from agentygg.api import GatewayError
+
+
+@pytest.fixture
+def home(tmp_path, monkeypatch):
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("YGG_INSTANCE", raising=False)
+    monkeypatch.delenv("YGG_AGENT_ID", raising=False)
+    monkeypatch.delenv("YGG_RELAY", raising=False)
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    return work
+
+
+def _follow(gw, calls):
+    """Run follow() until the gateway has been asked `calls` times; no real waiting."""
+    out = []
+
+    async def no_sleep(_s):
+        return None
+
+    code = asyncio.run(
+        lst.follow(gw, out=out.append, alive=lambda: len(gw.waits) < calls, sleep=no_sleep)
+    )
+    return code, out
+
+
+def test_follow_delivers_each_message_and_keeps_listening(home):
+    poll = _frame("system.ygg", "system", "closure poll")
+    gw = FakeGw(
+        [
+            {"wakes": [_frame("agent.betty", "agent", "first")], "mailbox": []},
+            {"wakes": [poll], "mailbox": []},
+            {"wakes": [], "mailbox": [_frame("human.ray", "human", "second")]},
+        ]
+    )
+    code, out = _follow(gw, calls=4)
+    assert code == lst.STOPPED  # only because the session is gone
+    assert len(out) == 2  # one block per delivery; the poll waited for the next real message
+    assert out[0].startswith(lst.FOLLOW_LEAD) and "first" in out[0]
+    assert "closure poll" in out[1] and "second" in out[1]
+    assert not store.listener_active("bot")  # handed back to the relay at once
+
+
+def test_a_one_off_refusal_wakes_nobody_and_a_lasting_one_is_told_once(home):
+    once = FakeGw(
+        [GatewayError(401, "unauthorized"), {"wakes": [_frame("agent.x", "agent", "hi")]}]
+    )
+    _, out = _follow(once, calls=3)
+    assert len(out) == 1 and "hi" in out[0]  # the hiccup never reached the session
+
+    lasting = FakeGw([GatewayError(401, "unauthorized")] * 6)
+    _, out = _follow(lasting, calls=6)
+    assert len(out) == 1 and "not reaching this session" in out[0] and "unauthorized" in out[0]
+
+
+def _listen_args(**kw):
+    base = dict(agent=None, all=False, timeout=0.0, while_pid=None, follow=True, here=True)
+    return types.SimpleNamespace(**{**base, **kw})
+
+
+def test_the_monitor_leaves_quietly_in_a_folder_of_no_agent(home, capsys):
+    store.save(store.Identity("solo", "lab"))  # the only agent here: still not this folder's
+    with pytest.raises(SystemExit) as e:
+        cli.cmd_listen(_listen_args())
+    assert e.value.code == 0
+    assert capsys.readouterr() == ("", "")
+
+
+def test_the_plugin_server_acts_only_as_this_folders_agent(home):
+    store.save(store.Identity("solo", "lab"))
+    assert mcp_server.plugin_identity() is None  # never "the only agent on this machine"
+    store.write_pointer(home, "solo")
+    assert mcp_server.plugin_identity().agent_id == "solo"
+
+
+def test_tools_act_under_the_live_listeners_lease(home):
+    store.touch_listen("solo", "listener-nonce")
+    gw = types.SimpleNamespace(identity=types.SimpleNamespace(agent_id="solo"), nonce="own")
+    http = types.SimpleNamespace(headers={"X-Ygg-Instance": "own"})
+    mcp_server.follow_listener(gw, http)
+    assert gw.nonce == http.headers["X-Ygg-Instance"] == "listener-nonce"
+    store.clear_listen("solo")
+    gw.nonce = http.headers["X-Ygg-Instance"] = "own"
+    mcp_server.follow_listener(gw, http)  # nobody listening: the session keeps its own
+    assert gw.nonce == "own"
+
+
+def test_setup_with_the_plugin_only_binds_the_folder(home, capsys):
+    store.save(store.Identity("solo", "lab"))
+    (home / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"agentygg": {"command": "ygg"}, "other": {"command": "x"}}})
+    )
+    skill = home / ".claude" / "skills" / "agentygg"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("old")
+    cli.cmd_setup(
+        types.SimpleNamespace(setup_cmd="claude", agent="solo", harness_path=None, plugin=True)
+    )
+    assert store.pointer_for(home) == ("solo", home)
+    assert json.loads((home / ".mcp.json").read_text()) == {
+        "mcpServers": {"other": {"command": "x"}}
+    }
+    assert not skill.exists() and not (home / ".agents").exists()
+    assert "claude --continue" in capsys.readouterr().out

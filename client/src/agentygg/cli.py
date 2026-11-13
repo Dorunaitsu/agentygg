@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -228,6 +229,9 @@ def cmd_connect(args) -> None:
                 "<claude|codex|hermes|openclaw|opencode>`, or for anything else "
                 '`ygg connect --harness command --cmd "<one turn of your agent>"`'
             )
+    plugin = bool(getattr(args, "plugin", False))
+    if plugin and kind != "claude":
+        _fail("--plugin is for Claude Code with the agentygg plugin (--harness claude)")
     if kind == "hermes":
         print(
             "Tip: on Hermes Agent, the plugin is the better way (the running agent answers, no "
@@ -250,7 +254,9 @@ def cmd_connect(args) -> None:
     # 3. Wire it (MCP server + skill), 4. start the relay.
     if kind != "command":
         cmd_setup(
-            _ap.Namespace(setup_cmd=kind, agent=ident.agent_id, harness_path=args.harness_path)
+            _ap.Namespace(
+                setup_cmd=kind, agent=ident.agent_id, harness_path=args.harness_path, plugin=plugin
+            )
         )
     else:
         cmd_setup(_ap.Namespace(setup_cmd="mcp", agent=ident.agent_id, harness_path=None))
@@ -409,6 +415,17 @@ def cmd_setup(args) -> None:
         ident.harness_path = args.harness_path or ""
         store.save(ident)
     done = [".agentygg                     which agent works here (no secret inside)"]
+    if kind == "claude" and getattr(args, "plugin", False):
+        # The agentygg plugin brings the MCP server, the protocol and the live pings: a project
+        # entry from an earlier `ygg setup claude` would list every tool twice, so it goes.
+        removed = _unwire_claude_project(root)
+        print(
+            f"This directory now belongs to @{ident.agent_id} (the agentygg plugin does the rest):"
+        )
+        for line in done + removed:
+            print(f"  {line}")
+        print("Start a new Claude Code session here (`claude --continue` keeps the conversation).")
+        return
     # The cross-harness skills location (agentskills.io): OpenClaw, Codex and others read it.
     _write_skill(root / ".agents" / "skills" / "agentygg")
     done.append(".agents/skills/agentygg/       the Agent'Ygg protocol skill")
@@ -581,7 +598,7 @@ def cmd_download(args) -> None:
 def cmd_mcp(args) -> None:
     from agentygg.mcp_server import run
 
-    run(getattr(args, "agent", None))
+    run(getattr(args, "agent", None), plugin=getattr(args, "plugin", False))
 
 
 def _write_opencode_plugin(root: Path, agent_id: str) -> Path:
@@ -598,25 +615,79 @@ def _write_opencode_plugin(root: Path, agent_id: str) -> Path:
     return dest
 
 
+def _unwire_claude_project(root: Path) -> list[str]:
+    """Take out what `ygg setup claude` wrote for Claude Code in this project (the agentygg
+    entry of .mcp.json and the project skill), for the plugin to take over. Other servers stay."""
+    import shutil
+
+    gone = []
+    mcp_path = root / ".mcp.json"
+    if mcp_path.is_file():
+        try:
+            cfg = json.loads(mcp_path.read_text())
+        except ValueError:
+            cfg = None
+        servers = cfg.get("mcpServers") if isinstance(cfg, dict) else None
+        if isinstance(servers, dict) and "agentygg" in servers:
+            del servers["agentygg"]
+            mcp_path.write_text(json.dumps(cfg, indent=2) + "\n")
+            gone.append(".mcp.json                     agentygg entry removed (the plugin has it)")
+    skill = root / ".claude" / "skills" / "agentygg"
+    if (skill / "SKILL.md").is_file():
+        shutil.rmtree(skill, ignore_errors=True)
+        gone.append(".claude/skills/agentygg/      removed (the plugin brings the protocol)")
+    return gone
+
+
 def cmd_listen(args) -> None:
     if os.environ.get("YGG_RELAY"):
         _fail(
             "ygg listen is for a session a human is having with the agent; this turn was "
             "started by the relay, which already delivers the pings"
         )
-    from agentygg.listen import listen, listen_nonce
+    from agentygg.listen import follow, listen, listen_nonce
 
-    ident = _identity(args)
-    print(f"ygg: listening for @{ident.agent_id}", file=sys.stderr, flush=True)
+    if args.here:
+        # Only the agent this folder belongs to (its `.agentygg` pointer), never "the only agent
+        # on this machine": the Claude Code plugin starts this in every session, and a folder
+        # nobody connected must not take that agent's messages. Not bound: leave quietly.
+        found = store.pointer_for()
+        if not found:
+            raise SystemExit(0)
+        try:
+            ident = store.load(found[0])
+        except LookupError:
+            raise SystemExit(0) from None
+    else:
+        ident = _identity(args)
+    if not args.follow:
+        print(f"ygg: listening for @{ident.agent_id}", file=sys.stderr, flush=True)
+
+    def say(text: str) -> None:
+        print(text, flush=True)
+        if args.follow:
+            print(flush=True)  # a blank line between deliveries
 
     async def go() -> int:
         gw = Gateway(ident, nonce=listen_nonce(ident.agent_id))
         try:
             alive = (lambda: store.pid_alive(args.while_pid)) if args.while_pid else None
+            if args.follow:
+                return await follow(gw, out=say, alive=alive)
             return await listen(gw, include_system=args.all, timeout=args.timeout, alive=alive)
         finally:
             await gw.close()
 
+    if args.follow:
+        import signal
+
+        # The session ending stops the monitor with SIGTERM: hand the pings back to the relay at
+        # once instead of after the listening mark expires.
+        def _term(*_):
+            raise KeyboardInterrupt
+
+        with contextlib.suppress(ValueError, OSError):
+            signal.signal(signal.SIGTERM, _term)
     try:
         code = asyncio.run(go())
     except KeyboardInterrupt:
@@ -719,6 +790,12 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--api", default=os.environ.get("YGG_API", store.DEFAULT_API))
     _harness_opts(a)
     a.add_argument("--no-relay", action="store_true", help="wire the harness, do not start a relay")
+    a.add_argument(
+        "--plugin",
+        action="store_true",
+        help="Claude Code with the agentygg plugin: bind the folder and start the relay, but leave "
+        "the MCP server and the skill to the plugin",
+    )
     a.add_argument("harness_args", nargs=argparse.REMAINDER)
     a.set_defaults(fn=cmd_connect)
 
@@ -772,6 +849,12 @@ def build_parser() -> argparse.ArgumentParser:
         a = ssub.add_parser(name, help=hlp)
         a.add_argument("--agent")
         a.add_argument("--harness-path", help="the harness executable, if not on PATH")
+        if name == "claude":
+            a.add_argument(
+                "--plugin",
+                action="store_true",
+                help="the agentygg plugin brings the MCP server and the skill: only bind the folder",
+            )
         a.set_defaults(fn=cmd_setup)
 
     a = sub.add_parser("inbox", help="take what is waiting for the agent")
@@ -830,6 +913,16 @@ def build_parser() -> argparse.ArgumentParser:
         dest="while_pid",
         help="stop when this process is gone (a plugin passes its harness's own pid)",
     )
+    a.add_argument(
+        "--follow",
+        action="store_true",
+        help="keep listening: print each message as it arrives (the Claude Code plugin's monitor)",
+    )
+    a.add_argument(
+        "--here",
+        action="store_true",
+        help="only the agent this folder belongs to; leave quietly when it belongs to none",
+    )
     a.set_defaults(fn=cmd_listen)
 
     a = sub.add_parser("directory", help="who is in the agent's workspace (humans and agents)")
@@ -839,6 +932,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     mcp_p = sub.add_parser("mcp", help="run the MCP server (your harness starts it)")
     mcp_p.add_argument("--agent", help="act as this agent wherever the harness starts the server")
+    mcp_p.add_argument(
+        "--plugin",
+        action="store_true",
+        help="started by the Claude Code plugin: this folder's agent only, live pings come by "
+        "themselves",
+    )
     mcp_p.set_defaults(fn=cmd_mcp)
     a = sub.add_parser("skill", help="print the Agent'Ygg protocol skill")
     a.add_argument(

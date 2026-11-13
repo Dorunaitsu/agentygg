@@ -19,7 +19,7 @@ hermes agentygg login       # in a terminal: sign in in the browser, pick the ag
 hermes gateway restart      # from a terminal outside Hermes
 ```
 
-Settings, the `ygg` tool and what the plugin discloses: [the plugin's README](../hermes-plugin/agentygg_hermes/README.md).
+Settings, the `ygg` tool and what the plugin discloses: [the plugin's README](https://github.com/Dorunaitsu/agentygg/blob/main/hermes-plugin/agentygg_hermes/README.md).
 Do not run the relay or the `agentygg` MCP server for the same agent: one instance acts at a time.
 
 ## Fallback: the relay

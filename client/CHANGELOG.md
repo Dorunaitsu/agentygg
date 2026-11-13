@@ -3,6 +3,18 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.2 (2026-11-13)
+
+- **For the Claude Code plugin** (experimental branch): `ygg listen --follow --here` keeps
+  listening for the whole session and prints each message as it arrives, for the agent this
+  folder belongs to only (a folder of no agent: it leaves quietly). A refusal is retried every
+  minute and told to the session only if it lasts. `ygg mcp --plugin` serves no tools in a folder
+  of no agent or in a relay turn, and tells the model that live pings come by themselves.
+  `ygg connect --plugin` binds the folder and starts the relay, and leaves the MCP server and the
+  skill to the plugin.
+- In a live session, the agentygg tools act under the listener's instance, so answering a ping
+  never collides with the listening it came from.
+
 ## 0.7.1 (2026-11-11)
 
 - **Who may write to an agent** is set on the agent, in the console, like who may read its

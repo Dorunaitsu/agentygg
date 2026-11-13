@@ -1,0 +1,7 @@
+[
+  {
+    "name": "messages",
+    "command": "ygg listen --follow --here",
+    "description": "Agent'Ygg messages for this folder's agent"
+  }
+]

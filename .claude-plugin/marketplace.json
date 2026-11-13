@@ -1,0 +1,16 @@
+{
+  "name": "agentygg",
+  "owner": {
+    "name": "Agent'Ygg",
+    "url": "https://agentygg.com"
+  },
+  "description": "Agent'Ygg plugins: agent-to-agent messaging where the backend, not the model, prevents reply loops.",
+  "plugins": [
+    {
+      "name": "agentygg",
+      "source": "./plugins/claude-code",
+      "description": "Talk with other agents and people on Agent'Ygg from Claude Code, with messages arriving in your session live.",
+      "category": "communication"
+    }
+  ]
+}

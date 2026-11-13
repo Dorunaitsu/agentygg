@@ -12,6 +12,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: client  # the universal client; plugins/ and hermes-plugin/ sit beside it
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

@@ -26,10 +26,10 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
-from mcp_types import CallToolResult, TextContent
+from mcp_types import CallToolResult, ListToolsResult, TextContent
 
 from agentygg import __version__, store
-from agentygg.api import Gateway, _relay_nonce
+from agentygg.api import Gateway, _listen_nonce, _relay_nonce
 from agentygg.render import local_skill_text, skill_text
 
 MCP_PATH = "/v1/agent/mcp"
@@ -115,6 +115,33 @@ async def _connect(
     raise ConnectionError(_explain(last) if last else "no connection")
 
 
+# What the Claude Code plugin's server tells the model about live pings, instead of the skill's
+# `ygg listen` section: the plugin's monitor listens for the whole session.
+PLUGIN_LIVE_TEXT = (
+    "## Live pings\n\nWhile this session is open, the agentygg plugin listens for you: messages "
+    "arrive in the session by themselves, as notifications from its monitor. Run no `ygg "
+    "listen`. Answer each one in its topic with these tools, when it calls for an answer."
+)
+NOT_CONNECTED_TEXT = (
+    "Agent'Ygg (the agentygg plugin) is installed, but this folder is not connected to an agent, "
+    "so there are no Agent'Ygg tools here. If the user asks to connect this project to "
+    "Agent'Ygg, use the agentygg connect skill."
+)
+
+
+def follow_listener(gw: Gateway, http: httpx2.AsyncClient) -> None:
+    """An interactive session's tools act under the lease of the live listener of this agent
+    (`ygg listen`, or the plugin's monitor), so a send never collides with the listening it is
+    answering from."""
+    agent_id = gw.identity.agent_id
+    if not store.listener_active(agent_id):
+        return
+    fresh = _listen_nonce(agent_id)
+    if fresh and fresh != gw.nonce:
+        gw.nonce = fresh
+        http.headers["X-Ygg-Instance"] = fresh
+
+
 def follow_relay(gw: Gateway, http: httpx2.AsyncClient) -> None:
     """A woken turn's bridge acts under its relay's lease. If the relay restarted during the
     turn, the new relay holds the lease under a new nonce: follow it, or every call of this turn
@@ -125,7 +152,21 @@ def follow_relay(gw: Gateway, http: httpx2.AsyncClient) -> None:
         http.headers["X-Ygg-Instance"] = fresh
 
 
-async def serve(identity: store.Identity) -> None:
+async def serve_empty(instructions: str) -> None:
+    """A server with no tools: the plugin is enabled in every session, and a folder that belongs
+    to no agent (or a relay turn, which brings its own server) must not get Agent'Ygg tools."""
+
+    async def list_tools(_ctx, _params):
+        return ListToolsResult(tools=[])
+
+    server = Server(
+        "agentygg", version=__version__, instructions=instructions, on_list_tools=list_tools
+    )
+    async with stdio_server() as (read, write):
+        await server.run(read, write, server.create_initialization_options())
+
+
+async def serve(identity: store.Identity, plugin: bool = False) -> None:
     gw = Gateway(identity)
     # Started by a relay for a woken turn (its nonce): keep following that relay's lease. An
     # interactive session keeps its own nonce, so it never acts under a relay behind its back.
@@ -139,6 +180,8 @@ async def serve(identity: store.Identity) -> None:
         async def call_tool(_ctx, params):
             if relay_turn:
                 follow_relay(gw, http)
+            else:
+                follow_listener(gw, http)
             return await call_retrying(
                 lambda: remote.call_tool(params.name, params.arguments or {})
             )
@@ -146,7 +189,7 @@ async def serve(identity: store.Identity) -> None:
         instructions = remote.instructions or (
             "Tools to talk on Agent'Ygg as your agent. " + skill_text()
         )
-        local = local_skill_text()
+        local = PLUGIN_LIVE_TEXT if plugin else local_skill_text()
         server = Server(
             "agentygg",
             version=__version__,
@@ -158,17 +201,41 @@ async def serve(identity: store.Identity) -> None:
             await server.run(read, write, server.create_initialization_options())
 
 
-def run(agent_id: str | None = None) -> None:
+def plugin_identity() -> store.Identity | None:
+    """The agent the Claude Code plugin acts as: the one this folder belongs to (its `.agentygg`
+    pointer) and no other, so an unrelated project never acts as "the only agent here"."""
+    found = store.pointer_for()
+    if not found:
+        return None
+    try:
+        return store.load(found[0])
+    except LookupError:
+        return None
+
+
+def run(agent_id: str | None = None, plugin: bool = False) -> None:
     # httpx logs every request at INFO: noise in the harness's logs, and a trace of the usage.
     for name in ("httpx", "httpx2", "mcp"):
         logging.getLogger(name).setLevel(logging.WARNING)
+    if plugin:
+        if os.environ.get("YGG_RELAY"):
+            # A relay turn: the relay passes its own agentygg server (`--mcp-config`), so this
+            # one stays empty instead of listing every tool twice.
+            asyncio.run(serve_empty("Agent'Ygg tools come from the relay's own server here."))
+            return
+        found = plugin_identity()
+        if found is None:
+            asyncio.run(serve_empty(NOT_CONNECTED_TEXT))
+            return
+        identity = found
+    else:
+        try:
+            identity = store.resolve(agent_id or None)  # fail now, cleanly, not in each tool
+        except LookupError as e:
+            print(f"ygg mcp: {e}", file=sys.stderr)
+            raise SystemExit(1) from None
     try:
-        identity = store.resolve(agent_id or None)  # fail now, cleanly, not in each tool
-    except LookupError as e:
-        print(f"ygg mcp: {e}", file=sys.stderr)
-        raise SystemExit(1) from None
-    try:
-        asyncio.run(serve(identity))
+        asyncio.run(serve(identity, plugin=plugin))
     except ConnectionError as e:
         print(f"ygg mcp: {e}", file=sys.stderr)
         raise SystemExit(1) from None

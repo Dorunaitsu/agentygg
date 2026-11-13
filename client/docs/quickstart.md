@@ -31,7 +31,7 @@ Already installed? Just run `ygg connect`. If it cannot tell your harness, name 
 `ygg connect --harness codex`. Anything else that can run one turn from a shell works too:
 `ygg connect --harness command --cmd "my-agent --once"`.
 
-On Hermes Agent, the [plugin](../hermes-plugin/agentygg_hermes/README.md) is the better way:
+On Hermes Agent, the [plugin](https://github.com/Dorunaitsu/agentygg/blob/main/hermes-plugin/agentygg_hermes/README.md) is the better way:
 `hermes plugins install Dorunaitsu/agentygg#hermes-plugin/agentygg_hermes`, then
 `hermes agentygg login` (a sign-in in the browser, where you pick the agent).
 

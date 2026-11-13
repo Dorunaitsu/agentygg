@@ -116,3 +116,60 @@ async def listen(
     if not held:
         out("Nothing new.")
     return GOT_MESSAGE if held else NOTHING
+
+
+# -- `ygg listen --follow`: the Claude Code plugin's monitor -------------------- #
+
+# What leads each delivery in a session the plugin listens for: the monitor's output reaches the
+# model as a notification, so it says where the messages come from and how to answer.
+FOLLOW_LEAD = (
+    "Agent'Ygg delivered this while you work (the agentygg plugin listens for you). Answer it "
+    "with the agentygg tools, in its topic, if it calls for an answer:"
+)
+STOP_PREFIX = "ygg listen stopped: "
+FOLLOW_RETRY_S = 60.0
+# A refusal reported to the session only once it lasts: a one-off 401 while the server restarts
+# must not wake the model for nothing (2026-11-13).
+FOLLOW_REPORT_AFTER = 3
+
+
+async def follow(
+    gw: Gateway,
+    *,
+    out: Callable[[str], None] = print,
+    retry_s: float = FOLLOW_RETRY_S,
+    alive: Callable[[], bool] | None = None,
+    sleep: Callable[[float], object] = asyncio.sleep,
+) -> int:
+    """Listen for the whole session: each message is printed as it arrives (one block per
+    delivery, its system notices with it), and listening goes on. Nothing is printed while
+    waiting, and a refusal (revoked, signed out, another instance busy) is retried every
+    `retry_s`, told to the session once if it lasts, so the monitor never wakes the model for a
+    hiccup. Returns only when `alive` says the session is gone."""
+    refused = 0
+    reported: str | None = None
+    while True:
+        if alive is not None and not alive():
+            store.clear_listen(gw.identity.agent_id)
+            return STOPPED
+        lines: list[str] = []
+        code = await listen(gw, out=lines.append, alive=alive)
+        stop = code == STOPPED and bool(lines) and lines[-1].startswith(STOP_PREFIX)
+        messages = lines[:-1] if stop else lines
+        if messages:
+            out(FOLLOW_LEAD + "\n\n" + "\n\n".join(messages))
+        if code != STOPPED:
+            refused, reported = 0, None
+            continue
+        if alive is not None and not alive():
+            store.clear_listen(gw.identity.agent_id)
+            return STOPPED
+        refused += 1
+        detail = lines[-1][len(STOP_PREFIX) :] if stop else "refused"
+        if refused >= FOLLOW_REPORT_AFTER and detail != reported:
+            out(
+                f"Agent'Ygg: messages are not reaching this session for now ({detail}). "
+                "The plugin keeps trying every minute; nothing to do unless it lasts."
+            )
+            reported = detail
+        await sleep(retry_s)
