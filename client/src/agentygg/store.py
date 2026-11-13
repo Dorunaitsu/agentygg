@@ -200,7 +200,7 @@ def touch_listen(agent_id: str, nonce: str) -> None:
     """Mark this agent as listened to by a live session (the relay steps aside meanwhile)."""
     p = listen_path(agent_id)
     p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(".tmp")
+    tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")  # per process: two listeners never race
     tmp.write_text(json.dumps({"nonce": nonce, "pid": os.getpid(), "ts": time.time()}))
     tmp.replace(p)
 
@@ -283,7 +283,52 @@ def write_pointer(directory: Path, agent_id: str) -> Path:
     legacy = directory / LEGACY_POINTER
     if legacy.is_file():  # a 0.4.0 pointer: migrated (never the ~/.ygg store folder)
         legacy.unlink()
+    record_binding(directory, agent_id)
     return f
+
+
+# -- folders this machine connected (YGG-SEC-2026-11-13-01) -------------------- #
+#
+# A `.agentygg` file says which agent a folder belongs to, but anyone can ship one: a cloned
+# repository, or a parent folder. The Claude Code plugin acts as that agent in every session it
+# finds one in, so it only honours a pointer this machine wrote itself (`ygg connect`, `ygg
+# setup`, `ygg agent use`), recorded here with the folder's real path.
+
+
+def bindings_path() -> Path:
+    return state_dir() / "bindings.json"
+
+
+def read_bindings() -> dict[str, str]:
+    try:
+        data = json.loads(bindings_path().read_text())
+    except (OSError, ValueError):
+        return {}
+    return (
+        {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
+        if isinstance(data, dict)
+        else {}
+    )
+
+
+def record_binding(directory: Path, agent_id: str) -> None:
+    data = read_bindings()
+    data[str(directory.resolve())] = agent_id
+    p = bindings_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f"bindings.{os.getpid()}.tmp")  # one per process: two writers never race
+    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+    tmp.replace(p)
+
+
+def trusted_pointer(start: Path | None = None) -> tuple[str, Path] | None:
+    """The folder's pointer, only if this machine wrote it (see record_binding): a `.agentygg`
+    that came with a repository or sits in a shared parent folder is ignored."""
+    found = pointer_for(start)
+    if not found:
+        return None
+    agent_id, directory = found
+    return found if read_bindings().get(str(directory.resolve())) == agent_id else None
 
 
 def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
@@ -305,6 +350,7 @@ def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
             raise LookupError(
                 f"this folder belongs to no agent, and this machine has several ({names}). "
                 "Connect this folder with `ygg connect` (sign in, then pick or create the "
-                "agent), bind it to one of them with `ygg agent use <id>`, or pass --agent <id>"
+                f"agent), bind it to one of them with `ygg agent use <id>` (for example `ygg "
+                f"agent use {ids[0]}`, without the @), or pass --agent <id>"
             )
     return load(agent_id)

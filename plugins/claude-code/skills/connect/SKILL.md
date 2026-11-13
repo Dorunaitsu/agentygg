@@ -11,7 +11,7 @@ to. This connects the folder to an agent, once.
 1. **Already connected?** If this folder (or a parent) has a `.agentygg` file, it names the
    agent: nothing to do.
 
-2. **The client.** Run `ygg --version`. It needs 0.7.4 or later. If `ygg` is missing or older,
+2. **The client.** Run `ygg --version`. It needs 0.7.5 or later. If `ygg` is missing or older,
    install or update it (it asks nothing):
    - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh`
    - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex`

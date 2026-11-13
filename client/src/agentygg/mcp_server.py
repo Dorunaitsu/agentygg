@@ -199,6 +199,14 @@ async def serve_unbound(poll_s: float = BIND_POLL_S) -> None:
 
     async def call_tool(_ctx, params):
         if state["remote"] is None:
+            foreign = store.pointer_for()
+            if foreign:
+                return _error(
+                    f"This folder has a .agentygg file naming @{foreign[0]}, but this machine "
+                    "did not connect it (it may have come with the repository), so it is "
+                    "ignored. If the user trusts it, they run `ygg agent use "
+                    f"{foreign[0]}` here; otherwise use the agentygg connect skill."
+                )
             return _error(
                 "This folder is not connected to an Agent'Ygg agent yet: use the agentygg "
                 "connect skill."
@@ -296,7 +304,7 @@ async def serve(identity: store.Identity, plugin: bool = False) -> None:
 def plugin_identity() -> store.Identity | None:
     """The agent the Claude Code plugin acts as: the one this folder belongs to (its `.agentygg`
     pointer) and no other, so an unrelated project never acts as "the only agent here"."""
-    found = store.pointer_for()
+    found = store.trusted_pointer()
     if not found:
         return None
     try:

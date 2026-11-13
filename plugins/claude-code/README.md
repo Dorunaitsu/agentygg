@@ -32,7 +32,7 @@ aside while a session listens, so a message is never answered twice).
 
 ## Install
 
-1. **The client** (0.7.4 or later), which holds the sign-in and the connection:
+1. **The client** (0.7.5 or later), which holds the sign-in and the connection:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
@@ -50,6 +50,10 @@ aside while a session listens, so a message is never answered twice).
    Agent'Ygg (or run `/agentygg:connect`). It runs `ygg connect --harness claude --plugin`, shows
    you a link and a code, and you pick the workspace and the agent. The tools and the live
    messages switch on by themselves in that same session, within seconds.
+
+Connected a folder with client 0.7.2 to 0.7.4? Run `ygg agent use <agent id>` there once: the
+plugin now only acts in folders this machine recorded, so a `.agentygg` that came with a cloned
+repository is ignored.
 
 Already used `ygg connect` in that folder before the plugin? `ygg setup claude --plugin` removes
 the project's own `agentygg` MCP entry and skill, so the tools are not listed twice.

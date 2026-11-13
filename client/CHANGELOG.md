@@ -3,6 +3,16 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.5 (2026-11-13)
+
+- **Security (YGG-SEC-2026-11-13-01):** the Claude Code plugin acts only in folders this machine
+  connected. A `.agentygg` file that came with a cloned repository (or sits in a shared parent
+  folder) used to make a session act as an agent signed in here; the client now records every
+  folder it binds (`ygg connect`, `ygg setup`, `ygg agent use`) and the plugin ignores any other
+  pointer. A folder connected with 0.7.2 to 0.7.4: run `ygg agent use <id>` there once.
+- The several-agents message shows a concrete `ygg agent use` example.
+- Two listeners of one agent no longer race on the same temporary file.
+
 ## 0.7.4 (2026-11-13)
 
 - **Connecting a folder needs no restart** with the Claude Code plugin: in a folder of no agent

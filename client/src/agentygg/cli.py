@@ -650,7 +650,7 @@ def _here_identity(wait: bool, poll_s: float = BIND_POLL_S, sleep=time.sleep):
     """The identity this folder belongs to; with `wait`, poll until there is one (printing
     nothing: in a folder nobody connects, this just sleeps until the session ends)."""
     while True:
-        found = store.pointer_for()
+        found = store.trusted_pointer()  # never a .agentygg this machine did not write
         if found:
             try:
                 return store.load(found[0])

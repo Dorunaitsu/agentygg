@@ -171,3 +171,17 @@ def test_short_messages_pass_whole_and_several_share_the_room():
     many = lst.fit_delivery([_rendered("x " * 2000, f"m{i}") for i in range(3)])
     assert len(many) <= lst.MONITOR_TOTAL + 600
     assert all(f"m{i}" in many for i in range(3))  # each one says where to read it whole
+
+
+def test_a_pointer_this_machine_did_not_write_is_ignored(home):
+    """YGG-SEC-2026-11-13-01: a .agentygg shipped in a cloned repository (or a shared parent
+    folder) must not make the plugin act as an agent signed in on this machine."""
+    store.save(store.Identity("solo", "lab"))
+    (home / ".agentygg").write_text("solo\n")  # came with the repository
+    assert store.pointer_for(home) == ("solo", home)  # the CLI still sees it
+    assert mcp_server.plugin_identity() is None
+    assert cli._here_identity(wait=False) is None
+    cli.cmd_agent_use(types.SimpleNamespace(agent_id="solo"))  # the user vouches for it
+    assert mcp_server.plugin_identity().agent_id == "solo"
+    (home / ".agentygg").write_text("other\n")  # swapped afterwards: not what was recorded
+    assert mcp_server.plugin_identity() is None
