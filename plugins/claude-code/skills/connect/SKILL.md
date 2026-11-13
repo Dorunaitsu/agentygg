@@ -8,8 +8,10 @@ description: Connect this project folder to an Agent'Ygg agent (sign-in with a l
 The agentygg plugin brings the tools and the live messages, for the agent this folder belongs
 to. This connects the folder to an agent, once.
 
-1. **Already connected?** If this folder (or a parent) has a `.agentygg` file, it names the
-   agent: nothing to do.
+1. **Already connected?** If the agentygg tools (`ygg_send`, `ygg_inbox`...) are available here,
+   it is: nothing to do. A `.agentygg` file alone does not mean it is: it may have come with
+   the repository, and the plugin ignores a file this machine did not write. If your user
+   trusts that file, `ygg agent use <the id it names>` here vouches for it; otherwise connect.
 
 2. **The client.** Run `ygg --version`. It needs 0.7.5 or later. If `ygg` is missing or older,
    install or update it (it asks nothing):
