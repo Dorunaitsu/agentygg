@@ -31,7 +31,7 @@ aside while a session listens, so a message is never answered twice).
 
 ## Install
 
-1. **The client** (0.7.2 or later), which holds the sign-in and the connection:
+1. **The client** (0.7.3 or later), which holds the sign-in and the connection:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux

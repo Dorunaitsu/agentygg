@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable
@@ -127,6 +128,65 @@ FOLLOW_LEAD = (
     "with the agentygg tools, in its topic, if it calls for an answer:"
 )
 STOP_PREFIX = "ygg listen stopped: "
+# Claude Code cuts a monitor notification at about 500 characters per line and 3,000 in all
+# (measured 2026-11-13: "...(truncated)"). A delivery is shaped to fit: long lines are wrapped,
+# and a message too long for its share is cut here, saying where to read it whole.
+MONITOR_LINE = 300
+MONITOR_TOTAL = 2400
+MONITOR_MIN_BODY = 300
+_MSG_ID = re.compile(r'message_id="([^"]+)"')
+_CONV_ID = re.compile(r'conversation_id="([^"]+)"')
+
+
+def _wrap(line: str, width: int = MONITOR_LINE) -> list[str]:
+    """A line split at spaces into pieces of at most `width` characters (a word longer than that
+    is split too)."""
+    out: list[str] = []
+    while len(line) > width:
+        cut = line.rfind(" ", 0, width + 1)
+        cut = cut if cut > width // 2 else width
+        out.append(line[:cut].rstrip())
+        line = line[cut:].lstrip()
+    out.append(line)
+    return out
+
+
+def fit_message(rendered: str, budget: int) -> str:
+    """One rendered message shaped for a monitor notification: its frame kept whole, its body
+    wrapped and, past `budget` characters, cut with a line saying how to read the rest."""
+    lines = rendered.split("\n")
+    if len(lines) < 2 or not lines[-1].startswith("</agentygg-message"):
+        return "\n".join(p for ln in lines for p in _wrap(ln))
+    head, body, tail = lines[0], lines[1:-1], lines[-1]
+    kept: list[str] = []
+    used = 0
+    cut = False
+    for piece in (p for ln in body for p in _wrap(ln)):
+        if used + len(piece) > budget:
+            room = budget - used
+            if room > 40:
+                kept.append(_wrap(piece, room)[0])
+            cut = True
+            break
+        kept.append(piece)
+        used += len(piece) + 1
+    if cut:
+        mid = _MSG_ID.search(head)
+        conv = _CONV_ID.search(head)
+        where = f" (message_id {mid.group(1)})" if mid else ""
+        how = f"ygg_conversation on {conv.group(1)}" if conv else "ygg_conversation"
+        kept.append(f"[cut here to fit the notification: read the whole message{where} with {how}]")
+    return "\n".join([head, *kept, tail])
+
+
+def fit_delivery(messages: list[str]) -> str:
+    """A delivery that fits a monitor notification: the lead, then each message with an equal
+    share of what is left (each one keeps at least a short preview)."""
+    overhead = sum(len(m.split("\n")[0]) + 25 for m in messages)
+    share = max(MONITOR_MIN_BODY, (MONITOR_TOTAL - len(FOLLOW_LEAD) - overhead) // len(messages))
+    return FOLLOW_LEAD + "\n\n" + "\n\n".join(fit_message(m, share) for m in messages)
+
+
 FOLLOW_RETRY_S = 60.0
 # A refusal reported to the session only once it lasts: a one-off 401 while the server restarts
 # must not wake the model for nothing (2026-11-13).
@@ -157,7 +217,7 @@ async def follow(
         stop = code == STOPPED and bool(lines) and lines[-1].startswith(STOP_PREFIX)
         messages = lines[:-1] if stop else lines
         if messages:
-            out(FOLLOW_LEAD + "\n\n" + "\n\n".join(messages))
+            out(fit_delivery(messages))
         if code != STOPPED:
             refused, reported = 0, None
             continue

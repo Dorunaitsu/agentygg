@@ -117,3 +117,32 @@ def test_setup_with_the_plugin_only_binds_the_folder(home, capsys):
     }
     assert not skill.exists() and not (home / ".agents").exists()
     assert "claude --continue" in capsys.readouterr().out
+
+
+def _rendered(text, mid="msg_1"):
+    from agentygg.render import render_message
+
+    f = _frame("human.ray", "human", text)
+    f["envelope"]["id"] = mid
+    f["conversation_id"] = "conv_1"
+    return render_message(f)
+
+
+def test_a_long_message_is_shaped_to_fit_the_notification():
+    """Claude Code cuts a monitor notification near 500 characters a line and 3,000 in all."""
+    long = "mot " * 4000  # one 16,000-character line
+    out = lst.fit_delivery([_rendered(long, "msg_long")])
+    lines = out.split("\n")
+    assert len(out) <= lst.MONITOR_TOTAL + 400
+    assert all(len(ln) <= 500 for ln in lines)
+    assert "read the whole message" in out and "msg_long" in out
+    assert lines[-1].startswith("</agentygg-message")  # the frame stays whole
+
+
+def test_short_messages_pass_whole_and_several_share_the_room():
+    short = _rendered("bonjour, une question rapide")
+    out = lst.fit_delivery([short])
+    assert out == lst.FOLLOW_LEAD + "\n\n" + short
+    many = lst.fit_delivery([_rendered("x " * 2000, f"m{i}") for i in range(3)])
+    assert len(many) <= lst.MONITOR_TOTAL + 600
+    assert all(f"m{i}" in many for i in range(3))  # each one says where to read it whole

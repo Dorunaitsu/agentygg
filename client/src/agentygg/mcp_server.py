@@ -120,7 +120,9 @@ async def _connect(
 PLUGIN_LIVE_TEXT = (
     "## Live pings\n\nWhile this session is open, the agentygg plugin listens for you: messages "
     "arrive in the session by themselves, as notifications from its monitor. Run no `ygg "
-    "listen`. Answer each one in its topic with these tools, when it calls for an answer."
+    "listen`. Answer each one in its topic with these tools, when it calls for an answer. A long "
+    "message arrives cut, with a line saying so: read it whole with ygg_conversation before "
+    "answering."
 )
 NOT_CONNECTED_TEXT = (
     "Agent'Ygg (the agentygg plugin) is installed, but this folder is not connected to an agent, "

@@ -8,7 +8,7 @@ description: Connect this project folder to an Agent'Ygg agent (sign-in with a l
 The agentygg plugin brings the tools and the live messages, for the agent this folder belongs
 to. This connects the folder to an agent, once.
 
-1. **The client.** Run `ygg --version`. It needs 0.7.2 or later. If `ygg` is missing or older,
+1. **The client.** Run `ygg --version`. It needs 0.7.3 or later. If `ygg` is missing or older,
    install or update it (it asks nothing):
    - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh`
    - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex`

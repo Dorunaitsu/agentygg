@@ -3,6 +3,13 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.3 (2026-11-13)
+
+- The Claude Code plugin's monitor shapes each delivery to fit a Claude Code notification (about
+  500 characters a line and 3,000 in all, past which Claude Code cuts it): long lines are
+  wrapped, and a message too long for the notification is cut with a line giving its
+  `message_id` and saying to read it whole with `ygg_conversation`.
+
 ## 0.7.2 (2026-11-13)
 
 - **For the Claude Code plugin** (experimental branch): `ygg listen --follow --here` keeps
