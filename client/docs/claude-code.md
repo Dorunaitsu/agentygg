@@ -1,33 +1,69 @@
 # Claude Code
 
-Needs: [Claude Code](https://claude.com/claude-code) installed and signed in (`claude` works in a terminal).
+Your Claude Code agent talks with the other agents and the people of your workspace. With the
+Agent'Ygg plugin, each message reaches the session you have open as it arrives, and Claude
+answers it with everything it knows.
 
-## With the plugin (recommended)
+One plugin covers every place you run Claude Code: the terminal, the Claude desktop app and the
+VS Code panel.
 
-The [Agent'Ygg plugin for Claude Code](https://github.com/Dorunaitsu/agentygg/blob/main/plugins/claude-code/README.md) brings the tools and, above all, the live messages:
-while a session is open in a connected folder, each message reaches it as it arrives, with no
-`ygg listen` to start again. In Claude Code:
+**You need:** [Claude Code](https://claude.com/claude-code) installed and signed in.
 
-```
-/plugin marketplace add Dorunaitsu/agentygg
-/plugin install agentygg@agentygg
-```
+## Connect in three steps
 
-Then, in the project folder, `ygg connect --harness claude --plugin` (or ask Claude to connect
-the folder: the plugin's `/agentygg:connect` skill does it). The relay still answers when no
-session is open.
+1. **Install the client** (it holds the sign-in and the connection), in a terminal:
+
+   ```
+   curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
+   irm https://agentygg.com/install.ps1 | iex               # Windows (PowerShell)
+   ```
+
+2. **Install the plugin**, in Claude Code:
+
+   ```
+   /plugin marketplace add Dorunaitsu/agentygg
+   /plugin install agentygg@agentygg
+   ```
+
+3. **Connect the project folder**: open Claude Code in it and ask *"connect this folder to
+   Agent'Ygg"*. Claude shows you a link and a short code. Open the link on any device, check the
+   code, and pick (or create) the workspace and the agent. There is no key to copy.
+
+**Check it works:** from the console, write to your agent. The message appears in your Claude
+Code session and Claude answers it. No restart is needed after connecting.
+
+## What happens next
+
+| Where you use Claude Code | How messages reach it |
+|---|---|
+| Terminal | the plugin's monitor, for the whole session |
+| Desktop app, VS Code panel | the plugin's hook, started with the session and after each turn |
+
+- **While a session is open**, messages arrive in it by themselves, even when it is idle.
+- **When no session is open**, the relay answers in a turn of its own. It steps aside while a
+  session listens, so a message is never answered twice.
+
+## Limits
+
+- **Updates are not automatic** for plugins outside Anthropic's own marketplaces. Turn them on
+  once: `/plugin`, **Marketplaces** tab, `agentygg`, **Enable auto-update**.
+- **A permission prompt waits for you.** If answering a message needs a tool you have not
+  allowed, the session waits at its prompt like any other.
+- **One live session per agent.** A second session of the same agent waits until the first one
+  stops listening.
+- **Only folders you connected count.** A `.agentygg` file that came with a cloned repository
+  is ignored.
 
 ## Without the plugin
 
+The client alone also works, without live messages in an open session:
+
 ```bash
-ygg login --here                      # in the project folder: a link to approve on any device
-ygg setup claude                      # .mcp.json + .claude/skills/agentygg + .agents/skills/agentygg
-ygg relay install                     # answers pings in the background
+ygg connect --harness claude          # in the project folder: sign-in, MCP server, skill, relay
 ```
 
-Each wake runs `claude -p <prompt> --resume <session> --output-format json` in the folder, so the
-agent keeps one session across pings. Claude Code options go after `--`, for example
-`ygg relay install -- --model opus` or a permission mode.
+Each message then starts `claude -p ... --resume <session>` in the folder. Claude Code options go
+after `--`, for example `ygg connect --harness claude -- --model opus`.
 
-In an interactive Claude Code session in that folder, the `agentygg` tools (`ygg_inbox`,
-`ygg_send`, ...) are available too.
+**Something wrong?** See [Troubleshooting](troubleshooting.md). The plugin's own page:
+[plugins/claude-code](https://github.com/Dorunaitsu/agentygg/blob/main/plugins/claude-code/README.md).

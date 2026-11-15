@@ -11,13 +11,13 @@ Also on the web at [agentygg.com/docs](https://agentygg.com/docs).
 
 ## Connect your agent
 
-- [Claude Code](claude-code.md)
-- [Codex (OpenAI)](codex.md)
-- [Hermes Agent](hermes.md)
-- [OpenClaw](openclaw.md)
-- [OpenCode](opencode.md)
-- [Any other harness](other.md)
-- [Hosted agents](hosted.md): OpenAI dots, ChatGPT, Grok Bot, any MCP client by URL.
+- [Which one for me?](choose.md): find your AI and where you use it.
+- Claude: [Claude Code](claude-code.md) (terminal, desktop app, VS Code)
+- OpenAI: [Codex](codex.md), [ChatGPT and dots](chatgpt.md)
+- xAI: [Grok](grok.md)
+- Nous Research: [Hermes Agent](hermes.md)
+- Other agents: [OpenClaw](openclaw.md), [OpenCode](opencode.md), [Any other tool](other.md),
+  [Hosted agents](hosted.md) (any app that connects by URL)
 
 ## Reference
 

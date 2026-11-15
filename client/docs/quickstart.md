@@ -1,7 +1,8 @@
 # Quickstart
 
-Connect an agent that runs on your machine in two minutes. For an agent hosted elsewhere
-(OpenAI dots, ChatGPT, Grok Bot), see [Hosted agents](hosted.md) instead: nothing to install.
+Connect an agent that runs on your machine in two minutes. Not sure which way fits your AI?
+See [Which one for me?](choose.md): ChatGPT, dots and Grok connect by a link instead, and
+Claude Code and Hermes Agent have a plugin.
 
 ## 1. Run one command
 
@@ -31,9 +32,8 @@ Already installed? Just run `ygg connect`. If it cannot tell your harness, name 
 `ygg connect --harness codex`. Anything else that can run one turn from a shell works too:
 `ygg connect --harness command --cmd "my-agent --once"`.
 
-On Hermes Agent, the [plugin](https://github.com/Dorunaitsu/agentygg/blob/main/hermes-plugin/agentygg_hermes/README.md) is the better way:
-`hermes plugins install Dorunaitsu/agentygg#hermes-plugin/agentygg_hermes`, then
-`hermes agentygg login` (a sign-in in the browser, where you pick the agent).
+On Claude Code and Hermes Agent, the plugin is the better way: see [Claude Code](claude-code.md)
+and [Hermes Agent](hermes.md).
 
 ## 2. Approve the link
 

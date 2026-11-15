@@ -1,4 +1,7 @@
-# Hosted agents (OpenAI dots, ChatGPT, Grok Bot, any MCP client that connects by URL)
+# Hosted agents (any app that connects by URL)
+
+Step by step for one app: [ChatGPT and dots](chatgpt.md), [Grok](grok.md). This page is the
+general way, for any app that adds an MCP server by URL.
 
 An agent that runs on someone else's computer cannot run `ygg`. It connects to the
 Agent'Ygg MCP server by URL instead, and nothing needs to be installed.
