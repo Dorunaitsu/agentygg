@@ -256,6 +256,19 @@ def windows_launchers(agent_id: str, workdir: Path, argv: list[str]) -> tuple[st
     return cmd, vbs
 
 
+def _startup_launcher(agent_id: str) -> Path:
+    """The relay's launcher in the user's Startup folder: what Windows runs at logon for this
+    user, no administrator needed."""
+    appdata = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+    startup = appdata / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    return startup / f"{TASK_PREFIX}{agent_id}.vbs"
+
+
+def _windows_launch(vbs_path: Path) -> None:
+    """Start the relay now (the .vbs runs it hidden and returns at once)."""
+    subprocess.Popen(["wscript.exe", str(vbs_path)], close_fds=True)
+
+
 def _windows_install(agent_id: str, workdir: Path, argv: list[str]) -> Path:
     d = relays_dir()
     d.mkdir(parents=True, exist_ok=True)
@@ -265,16 +278,27 @@ def _windows_install(agent_id: str, workdir: Path, argv: list[str]) -> Path:
     vbs_path.write_text(vbs)
     name = _task_name(agent_id)
     _windows_stop(agent_id)
+    startup = _startup_launcher(agent_id)
     r = _run(
         "schtasks", "/Create", "/TN", name, "/TR", f'wscript.exe "{vbs_path}"',
         "/SC", "ONLOGON", "/RL", "LIMITED", "/F",
     )  # fmt: skip
-    if r.returncode != 0:
+    if r.returncode == 0:
+        startup.unlink(missing_ok=True)  # one way to start it, not two
+        _run("schtasks", "/Run", "/TN", name)
+        return vbs_path
+    # A logon task needs an administrator on most Windows setups ("Access is denied" for a
+    # standard user, 2026-11-15): start it from the user's Startup folder instead.
+    try:
+        startup.parent.mkdir(parents=True, exist_ok=True)
+        startup.write_text(vbs)
+    except OSError as e:
         raise RuntimeError(
-            f"Task Scheduler refused the relay: {r.stderr.strip() or r.stdout.strip()}"
-        )
-    _run("schtasks", "/Run", "/TN", name)
-    return vbs_path
+            f"Task Scheduler refused the relay ({r.stderr.strip() or r.stdout.strip()}) and "
+            f"the Startup folder is not writable ({e})"
+        ) from e
+    _windows_launch(startup)
+    return startup
 
 
 def _windows_stop(agent_id: str) -> None:
@@ -289,8 +313,13 @@ def _windows_stop(agent_id: str) -> None:
 
 
 def _windows_running(agent_id: str) -> bool:
-    r = _run("schtasks", "/Query", "/TN", _task_name(agent_id), "/FO", "LIST")
-    return r.returncode == 0 and "Running" in r.stdout
+    """Whether the relay runs: its own process, whatever started it (task or Startup folder)
+    and whatever the language of Windows (schtasks prints "Running" only in English)."""
+    try:
+        pid = json.loads((store.state_dir() / f"{agent_id}.instance").read_text()).get("pid")
+    except (OSError, ValueError):
+        return False
+    return isinstance(pid, int) and pid > 0 and store.pid_alive(pid)
 
 
 # -- public API --------------------------------------------------------------- #
@@ -363,6 +392,9 @@ def remove(agent_id: str) -> bool:
         _windows_stop(agent_id)
         r = _run("schtasks", "/Delete", "/TN", _task_name(agent_id), "/F")
         existed = existed or r.returncode == 0
+        startup = _startup_launcher(agent_id)
+        existed = existed or startup.exists()
+        startup.unlink(missing_ok=True)
         for ext in ("cmd", "vbs"):
             (relays_dir() / f"{agent_id}.{ext}").unlink(missing_ok=True)
         path = _meta_path(agent_id)
@@ -426,4 +458,8 @@ def restart(agent_id: str) -> None:
         _systemctl("restart", f"{UNIT_PREFIX}{agent_id}.service")
     else:
         _windows_stop(agent_id)
-        _run("schtasks", "/Run", "/TN", _task_name(agent_id))
+        startup = _startup_launcher(agent_id)
+        if startup.exists():
+            _windows_launch(startup)
+        else:
+            _run("schtasks", "/Run", "/TN", _task_name(agent_id))

@@ -597,3 +597,31 @@ def test_windows_processes_take_turns_to_refresh_a_sign_in(tmp_path):
         order.append("first")  # the second one is still waiting for the lock
     t.join(5)
     assert order == ["first", "second"]
+
+
+def test_a_standard_windows_user_gets_the_relay_from_the_startup_folder(tmp_path, monkeypatch):
+    """Ray's Windows PC, 2026-11-15: `schtasks /SC ONLOGON` answered "Access is denied" (a
+    logon task needs an administrator), so the relay never started. It now falls back to the
+    user's Startup folder and starts at once; removing the relay removes that launcher too."""
+    from agentygg import service
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    calls, launched = [], []
+
+    def fake_run(*args):
+        calls.append(args)
+        refused = args[:2] == ("schtasks", "/Create")
+        return types.SimpleNamespace(
+            returncode=1 if refused else 0, stdout="", stderr="ERROR: Access is denied."
+        )
+
+    monkeypatch.setattr(service, "_run", fake_run)
+    monkeypatch.setattr(service, "_windows_launch", lambda p: launched.append(p))
+    path = service._windows_install("bot", tmp_path, ["ygg", "agent", "run", "--agent", "bot"])
+    startup = service._startup_launcher("bot")
+    assert path == startup and startup.exists() and launched == [startup]
+    assert "Startup" in str(startup) and startup.read_text().startswith("CreateObject")
+    monkeypatch.setattr(service, "system", lambda: "schtasks")
+    service.remove("bot")
+    assert not startup.exists()

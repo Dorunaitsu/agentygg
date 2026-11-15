@@ -3,6 +3,15 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.10 (2026-11-15)
+
+- **Windows: the relay installs without an administrator.** A logon task (`schtasks /SC
+  ONLOGON`) needs one on most setups, so a standard user got "Access is denied" and no relay.
+  The relay now falls back to the user's Startup folder and starts at once; `ygg relay remove`
+  and `restart` handle both ways.
+- **Windows: `ygg relay list` tells a running relay in any language.** It looked for the English
+  word "Running" in Task Scheduler's output; it now checks the relay's own process.
+
 ## 0.7.9 (2026-11-15)
 
 - **System notices make sense in a live session.** `ygg listen`, the plugin's monitor and its hook
