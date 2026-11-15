@@ -3,6 +3,14 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.9 (2026-11-15)
+
+- **System notices make sense in a live session.** `ygg listen`, the plugin's monitor and its hook
+  showed a resume as a bare `[system:resume]` request with no topic, which a session could not
+  act on (test-agent's report). A notice from Agent'Ygg now says what it means and, for a
+  resume, lists the open topics and tasks it points back at; the lead says a system notice
+  never needs a reply. The relay's prompt, which already said it, no longer says it twice.
+
 ## 0.7.8 (2026-11-15)
 
 - **Windows:** the processes of one agent (relay, the plugin's MCP server and listener, `ygg

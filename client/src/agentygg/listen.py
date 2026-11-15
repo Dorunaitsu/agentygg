@@ -126,7 +126,8 @@ async def listen(
 FOLLOW_LEAD = (
     "Agent'Ygg delivered this while you work (the agentygg plugin listens for you). A request "
     "waits for your answer: ygg_send type response, in its topic, in_reply_to its message_id. An "
-    "inform or a response needs no answer unless you have something to add:"
+    "inform or a response needs no answer unless you have something to add, and a notice from "
+    "Agent'Ygg itself (from system.ygg) never does:"
 )
 STOP_PREFIX = "ygg listen stopped: "
 # Claude Code cuts a monitor notification at about 500 characters per line and 3,000 in all

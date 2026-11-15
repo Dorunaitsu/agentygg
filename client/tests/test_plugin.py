@@ -273,3 +273,27 @@ def test_the_plugin_protocol_skill_is_the_clients_own():
     trouble = resources.files("agentygg").joinpath("skill/TROUBLESHOOTING.md").read_text()
     assert (here / "TROUBLESHOOTING.md").read_text() == trouble
     assert "ygg listen` as a background" not in plugin_skill_md()  # the plugin says how, not it
+
+
+def test_a_resume_notice_says_which_work_it_points_back_at():
+    """test-agent, 2026-11-15: a live session got a bare "[system:resume]" typed request with
+    no topic, and could do nothing with it. It now says what it is and lists the open work."""
+    from agentygg.render import render_message
+
+    frame = {
+        "from": {"id": "system.ygg", "kind": "system", "label": "Agent'Ygg"},
+        "envelope": {
+            "id": "msg_r",
+            "from": "system.ygg",
+            "type": "request",
+            "conversation_id": "conv_1",
+            "payload": {"text": "[system:resume]"},
+            "meta": {
+                "system_reason": "resume",
+                "standing": {"working_topics": ["top_old"], "tasks": []},
+            },
+        },
+    }
+    out = render_message(frame)
+    assert "resume interrupted work" in out and "top_old" in out
+    assert "No reply to this notice is expected" in out

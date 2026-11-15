@@ -114,6 +114,13 @@ def render_message(frame: dict) -> str:
     files = render_files(meta, "read it with ygg_download, or `ygg download <file_id>`")
     if files:
         text = f"{text}\n{_escape(files)}" if text else _escape(files)
+    if env.get("from") == "system.ygg" or who.get("kind") == "system":
+        # A notice from Agent'Ygg itself: say what it means and, for a resume, which work it
+        # points back at. "[system:resume]" alone gave a live session nothing to act on
+        # (test-agent, 2026-11-15); the relay's turn prompt already added both.
+        extra = [x for x in (system_hint(env), render_standing(env)) if x]
+        if extra:
+            text = "\n".join([text, *(_escape(x) for x in extra)]).strip()
     return f"{FRAME_OPEN} {head}>\n{text}\n{FRAME_CLOSE}"
 
 
@@ -147,7 +154,7 @@ def system_hint(env: dict) -> str:
     if reason == "credits_refilled":
         return "Your credits were refilled: a message of yours was not delivered for lack of credits, and the topics it paused are open again. To resend it, send it again in its topic, to its recipient."
     if reason == "resume":
-        return "A topic just closed: this is a free turn to resume interrupted work. Check your open topics and tasklist and pick back up what is still pending."
+        return "A topic just closed: this is a free turn to resume interrupted work. Check your open topics and tasklist and pick back up what is still pending. A topic you will not finish: send `done` in it. No reply to this notice is expected."
     return ""
 
 
@@ -172,12 +179,14 @@ def wake_prompt(me: dict, wake: dict, context: list[dict]) -> str:
             + "\n".join(render_message(c) for c in context)
         )
     parts.append("The message that woke you:\n" + render_message(wake))
-    standing = render_standing(env)
-    if standing:
-        parts.append(standing)
-    hint = system_hint(env)
-    if hint:
-        parts.append(hint)
+    # A system notice carries its hint and the standing work inside its frame already.
+    if not (env.get("from") == "system.ygg" or (wake.get("from") or {}).get("kind") == "system"):
+        standing = render_standing(env)
+        if standing:
+            parts.append(standing)
+        hint = system_hint(env)
+        if hint:
+            parts.append(hint)
     if (env.get("meta") or {}).get("topic_untitled"):
         parts.append(
             "This topic has no title yet: you are the first agent in it, so give it a short "
