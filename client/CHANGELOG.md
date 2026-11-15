@@ -3,6 +3,13 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.11 (2026-11-15)
+
+- **Windows:** messages from Task Scheduler and other Windows tools read right in any language
+  (they print in the console's code page; "Accès refusé" used to arrive garbled).
+- **`ygg connect` says when only the relay failed:** the sign-in and the wiring worked, the
+  agent answers in open sessions, and `ygg relay install` tries the relay again.
+
 ## 0.7.10 (2026-11-15)
 
 - **Windows: the relay installs without an administrator.** A logon task (`schtasks /SC

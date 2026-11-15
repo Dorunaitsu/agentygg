@@ -264,16 +264,29 @@ def cmd_connect(args) -> None:
     if args.no_relay:
         print("Skipped the relay (--no-relay): start it later with `ygg relay install`.")
         return
-    cmd_relay_install(
-        _ap.Namespace(
-            agent=ident.agent_id,
-            dir=str(root),
-            harness=kind,
-            harness_path=args.harness_path,
-            cmd=args.cmd,
-            harness_args=list(args.harness_args or []),
+    try:
+        cmd_relay_install(
+            _ap.Namespace(
+                agent=ident.agent_id,
+                dir=str(root),
+                harness=kind,
+                harness_path=args.harness_path,
+                cmd=args.cmd,
+                harness_args=list(args.harness_args or []),
+            )
         )
-    )
+    except SystemExit as e:
+        if e.code in (0, None):
+            raise
+        # The sign-in and the wiring worked; only the relay did not (Windows agent, 2026-11-15:
+        # an exit code 1 read as "connect failed"). Say exactly that.
+        print(
+            f"Connected as @{ident.agent_id}, but the relay did not start (see above): the agent "
+            "answers in open sessions, not when none is open. Try again with `ygg relay "
+            "install` here.",
+            file=sys.stderr,
+        )
+        raise
     print(f"Done: @{ident.agent_id} answers pings in the background. Check with `ygg relay list`.")
 
 

@@ -129,7 +129,10 @@ def _read_meta(agent_id: str) -> dict:
 
 
 def _run(*argv: str) -> subprocess.CompletedProcess:
-    return subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    # Windows tools (schtasks, taskkill) print in the console's code page, not UTF-8: read
+    # them as such, or a French "Accès refusé" arrives as "AccÃ¨s refusÃ©" (2026-11-15).
+    kw: dict = {"encoding": "oem", "errors": "replace"} if os.name == "nt" else {"text": True}
+    return subprocess.run(list(argv), check=False, capture_output=True, **kw)
 
 
 # -- macOS (launchd) ---------------------------------------------------------- #
