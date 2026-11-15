@@ -185,3 +185,45 @@ def test_a_pointer_this_machine_did_not_write_is_ignored(home):
     assert mcp_server.plugin_identity().agent_id == "solo"
     (home / ".agentygg").write_text("other\n")  # swapped afterwards: not what was recorded
     assert mcp_server.plugin_identity() is None
+
+
+def test_the_plugin_tells_each_surface_how_pings_arrive(monkeypatch):
+    """The VS Code panel runs no plugin monitor: there the model listens itself (ygg listen)."""
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
+    bound = mcp_server.plugin_instructions(True)
+    assert "Run no `ygg listen`" in bound and "/agentygg:agentygg" in bound  # where the protocol is
+    assert "VS Code" not in mcp_server.plugin_instructions(False)
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "claude-vscode")
+    assert "run `ygg listen` as a background command" in mcp_server.plugin_instructions(True)
+    assert "VS Code panel" in mcp_server.plugin_instructions(False)
+
+
+def test_the_plugin_instructions_fit_what_claude_code_keeps(monkeypatch):
+    """Claude Code cuts a server's instructions at 4,096 characters: the part about live pings
+    came last and never reached the model (2026-11-15)."""
+    for entry in ("cli", "claude-vscode"):
+        monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", entry)
+        for bound in (True, False):
+            assert len(mcp_server.plugin_instructions(bound)) < 3500
+
+
+def test_the_plugin_protocol_skill_is_the_clients_own():
+    """claude-plugin/skills/agentygg is generated from the client's skill: regenerate it with
+    render.plugin_skill_md() when the skill changes."""
+    from importlib import resources
+    from pathlib import Path
+
+    from agentygg.render import plugin_skill_md
+
+    client = Path(__file__).resolve().parent.parent
+    places = [  # the private source, then the public repo's layout (plugins/ beside client/)
+        client / "claude-plugin" / "skills" / "agentygg",
+        client.parent / "plugins" / "claude-code" / "skills" / "agentygg",
+    ]
+    here = next((d for d in places if d.is_dir()), None)
+    if here is None:
+        pytest.skip("the plugin is not next to this client")
+    assert (here / "SKILL.md").read_text() == plugin_skill_md()
+    trouble = resources.files("agentygg").joinpath("skill/TROUBLESHOOTING.md").read_text()
+    assert (here / "TROUBLESHOOTING.md").read_text() == trouble
+    assert "ygg listen` as a background" not in plugin_skill_md()  # the plugin says how, not it

@@ -3,6 +3,20 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.6 (2026-11-15)
+
+- **The Claude Code plugin's instructions reach the model whole.** Claude Code cuts a server's
+  instructions at 4,096 characters, and the protocol plus the live-pings part ran past it: the
+  end never arrived. The plugin's server now gives a short version (the essentials and how
+  messages arrive here), and the whole protocol is the plugin's `agentygg` skill, generated
+  from the client's own (`render.plugin_skill_md`, kept identical by a test).
+- **The plugin's server answers Claude Code at once** and connects to Agent'Ygg in the
+  background, so its instructions are in the session from the first turn; the tools wait for
+  the connection a few seconds if asked right away.
+- **In the VS Code panel** (an SDK session, where plugin monitors do not run), the plugin tells
+  the model to listen itself with `ygg listen` in the background; in the terminal, messages keep
+  arriving by themselves.
+
 ## 0.7.5 (2026-11-13)
 
 - **Security (YGG-SEC-2026-11-13-01):** the Claude Code plugin acts only in folders this machine

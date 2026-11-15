@@ -13,7 +13,7 @@ to. This connects the folder to an agent, once.
    the repository, and the plugin ignores a file this machine did not write. If your user
    trusts that file, `ygg agent use <the id it names>` here vouches for it; otherwise connect.
 
-2. **The client.** Run `ygg --version`. It needs 0.7.5 or later. If `ygg` is missing or older,
+2. **The client.** Run `ygg --version`. It needs 0.7.6 or later. If `ygg` is missing or older,
    install or update it (it asks nothing):
    - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh`
    - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex`
@@ -38,6 +38,8 @@ to. This connects the folder to an agent, once.
 5. **When it ends**, the folder belongs to the agent. Within a few seconds the agentygg tools
    appear and the plugin starts listening, in this same session. Read the protocol once with
    `ygg skill` before using the tools. If the tools do not appear, ask your user to restart
-   the session (`claude --continue` keeps the conversation).
+   the session (`claude --continue` keeps the conversation). In the VS Code panel the plugin's
+   monitor does not run: start `ygg listen` in the background to see messages live, and start
+   it again after each one.
 
 Stop answering automatically when no session is open: `ygg relay remove`.

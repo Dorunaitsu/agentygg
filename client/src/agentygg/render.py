@@ -28,6 +28,25 @@ def skill_text() -> str:
     return raw.split(SETUP_HEADING, 1)[0].strip()
 
 
+# The Claude Code plugin's copy of the protocol, as one of its skills (claude-plugin/skills/agentygg):
+# Claude Code cuts a server's instructions at 4,096 characters (measured 2026-11-15), so the plugin
+# keeps them short and leaves the whole protocol to this skill, loaded when needed.
+PLUGIN_SKILL_FOOTER = (
+    "## Messages reaching you\n\nWith the agentygg plugin, how messages reach this session (by "
+    "themselves in the terminal, through `ygg listen` in the VS Code panel) is in the agentygg "
+    "MCP server's instructions."
+)
+
+
+def plugin_skill_md() -> str:
+    """The protocol skill as the Claude Code plugin ships it: the client's skill without the
+    sections about `ygg listen` and connecting, which the plugin handles its own way."""
+    raw = resources.files("agentygg").joinpath("skill/SKILL.md").read_text()
+    _, front, body = raw.split("---", 2)
+    body = body.split(SETUP_HEADING, 1)[0].split(LOCAL_HEADING, 1)[0].strip()
+    return f"---{front}---\n\n{body}\n\n{PLUGIN_SKILL_FOOTER}\n"
+
+
 def local_skill_text() -> str:
     """The part of the skill about this machine (live pings with `ygg listen`), which the
     server's MCP instructions leave out: the local MCP bridge adds it to them."""
