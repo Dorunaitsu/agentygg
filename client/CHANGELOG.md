@@ -3,6 +3,18 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.7 (2026-11-15)
+
+- **Live messages in the VS Code panel and the desktop app too**, with nothing for the model to
+  start. Claude Code runs no plugin monitor there (they are SDK sessions), so the plugin listens
+  with an `asyncRewake` hook: `ygg listen --hook` waits for the next message and exits 2 with it,
+  which wakes the session even when idle; Claude Code starts it with the session and again after
+  every turn. In the terminal the monitor keeps doing it (the hook steps aside). Verified in a
+  desktop-mode session: an idle session woke on a message and answered.
+- **The relay no longer stops on one refusal.** After a lost connection the gateway refused a
+  relay once and it stopped for good, though its sign-in was fine. It now signs in again and
+  retries, and stops only after six refusals in a row (several minutes).
+
 ## 0.7.6 (2026-11-15)
 
 - **The Claude Code plugin's instructions reach the model whole.** Claude Code cuts a server's

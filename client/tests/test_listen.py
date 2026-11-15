@@ -295,3 +295,43 @@ def test_relay_restart_outside_a_turn_restarts_at_once(home, monkeypatch):
     monkeypatch.setattr(cli, "_relay_target", lambda args: "bot")
     cli.cmd_relay_restart(types.SimpleNamespace())
     assert called == ["bot"] and not store.restart_requested("bot")
+
+
+def test_a_refused_reconnection_is_retried_and_only_a_lasting_one_stops_the_relay(
+    home, monkeypatch
+):
+    """2026-11-14: after a lost connection the gateway refused test-agent's relay once and the
+    relay stopped for good, though its sign-in was fine. Now it signs in again and retries; it
+    stops only after REFUSALS_BEFORE_STOP refusals in a row."""
+    from agentygg import relay as rl
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr("agentygg.relay.asyncio.sleep", no_sleep)
+    relay = Relay(store.Identity("bot", "lab", "yga_x"), home, command=["true"])
+    relay._listened = lambda: False
+    tries = []
+
+    async def flaky():
+        tries.append(1)
+        if len(tries) <= 2:
+            raise GatewayError(401, "the gateway refused the connection")
+        raise RuntimeError("connected again")  # the hiccup passed: the relay kept going
+
+    relay._stream_once = flaky
+    with pytest.raises(RuntimeError):
+        asyncio.run(relay._reader())
+    assert len(tries) == 3
+
+    tries.clear()
+
+    async def refused():
+        tries.append(1)
+        raise GatewayError(403, "revoked")
+
+    relay._stream_once = refused
+    with pytest.raises(GatewayError):
+        asyncio.run(relay._reader())
+    assert len(tries) == rl.REFUSALS_BEFORE_STOP
+    asyncio.run(relay.gw.close())

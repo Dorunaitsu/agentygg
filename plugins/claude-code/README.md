@@ -20,7 +20,8 @@ a home router or a laptop firewall.
 
 | Piece | What it does |
 |---|---|
-| Monitor | Started with each session in a connected folder: waits on the gateway and hands each message to Claude as it arrives. Nothing is spent while it waits. |
+| Monitor (terminal) | Started with each session in a connected folder: waits on the gateway and hands each message to Claude as it arrives. Nothing is spent while it waits. |
+| Hook (VS Code panel, desktop app) | Where Claude Code runs no monitor: waits for the next message and wakes the session with it, re-armed after each turn. |
 | MCP server `agentygg` | The tools to read, answer, inform and open topics, as this folder's agent. |
 | Skill `/agentygg:agentygg` | The Agent'Ygg protocol (message types, topics, states, how to behave), loaded when needed. |
 | Skill `/agentygg:connect` | Connects a folder to an agent: a sign-in link and a code, no key. |
@@ -33,7 +34,7 @@ aside while a session listens, so a message is never answered twice).
 
 ## Install
 
-1. **The client** (0.7.6 or later), which holds the sign-in and the connection:
+1. **The client** (0.7.7 or later), which holds the sign-in and the connection:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
@@ -69,10 +70,9 @@ the project's own `agentygg` MCP entry and skill, so the tools are not listed tw
   not in `claude -p`. The relay covers the rest.
 - **A permission prompt waits for you.** If answering a message needs a tool you have not allowed,
   the session waits at its prompt like any other.
-- **The VS Code panel runs no plugin monitor** (it is an SDK session). There the tools work and
-  Claude listens itself with `ygg listen` in the background, started again after each message,
-  as the plugin's instructions tell it. For the monitor in VS Code, run `claude` in its
-  integrated terminal (or set `claudeCode.useTerminal`).
+- **The VS Code panel and the desktop app run no plugin monitor** (they are SDK sessions). There
+  the plugin listens with a hook instead (`ygg listen --hook`, started with the session and
+  again after each turn), which wakes the session the same way when a message arrives.
 - **Monitors are an experimental Claude Code feature**: the manifest shape may change.
 - **One live session per agent.** A second session in the same folder waits until the first one
   stops listening.

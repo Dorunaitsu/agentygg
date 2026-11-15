@@ -127,20 +127,22 @@ PLUGIN_LIVE_TEXT = (
 # Told to the model in a folder of no agent. Claude Code keeps a server's first instructions for
 # the whole conversation (even across `claude --continue`), so this stays true once the folder is
 # connected (test-agent, 2026-11-13): it never says "there are no tools here".
-# The VS Code panel runs Claude Code as an SDK session, where plugin monitors do not start
-# (checked 2026-11-15 with the extension's own binary and flags): there the model listens itself.
+# Plugin monitors run in the terminal only. The VS Code panel and the desktop app run Claude Code
+# as an SDK session, where they do not start (checked 2026-11-15); there the plugin listens with
+# an `asyncRewake` hook instead (`ygg listen --hook`), which wakes the session the same way.
 PLUGIN_LIVE_VSCODE_TEXT = (
-    "## Live pings\n\nThis session runs in the VS Code panel, where the agentygg plugin's monitor "
-    "does not run. To see your pings live, run `ygg listen` as a background command: it waits "
-    "for free and ends when a human or an agent writes, printing the message. Answer it in its "
-    "topic with these tools, then start `ygg listen` again. While it runs, this machine's relay "
-    "for you steps aside; when nothing listens, the relay answers."
+    "## Live pings\n\nWhile this session is open, the agentygg plugin listens for you (here "
+    "through a hook, started with the session and again after each of your turns): messages "
+    "arrive in the session by themselves. Run no `ygg listen`. Answer each one in its topic with "
+    "these tools, when it calls for an answer. A long message arrives cut, with a line saying "
+    "so: read it whole with ygg_conversation before answering."
 )
 
 
 def in_vscode_panel() -> bool:
-    """Claude Code started by the VS Code extension's panel (an SDK session, no monitors)."""
-    return os.environ.get("CLAUDE_CODE_ENTRYPOINT") == "claude-vscode"
+    """Claude Code started by something other than the terminal (the VS Code panel, the desktop
+    app, the SDK): plugin monitors do not run there. An unset entry point is an older terminal."""
+    return os.environ.get("CLAUDE_CODE_ENTRYPOINT", "cli") not in ("", "cli")
 
 
 NOT_CONNECTED_TEXT = (
@@ -148,10 +150,6 @@ NOT_CONNECTED_TEXT = (
     "While the folder belongs to no agent there are none; if the user asks to connect this "
     "project to Agent'Ygg, use the agentygg connect skill. Once it is connected, the tools appear "
     "by themselves; read the protocol once with `ygg skill` before using them."
-)
-NOT_CONNECTED_VSCODE_NOTE = (
-    " In this VS Code panel the plugin's monitor does not run: once connected, run `ygg listen` "
-    "in the background to see messages live, and start it again after each one."
 )
 # How often a server started in a folder of no agent looks for the folder's `.agentygg`.
 BIND_POLL_S = 5.0
@@ -235,7 +233,7 @@ def plugin_instructions(bound: bool) -> str:
     """What the plugin's server tells the model, known before any connection: the protocol from
     this client's own skill and the way live pings arrive here, or how to connect the folder."""
     if not bound:
-        return NOT_CONNECTED_TEXT + (NOT_CONNECTED_VSCODE_NOTE if in_vscode_panel() else "")
+        return NOT_CONNECTED_TEXT
     live = PLUGIN_LIVE_VSCODE_TEXT if in_vscode_panel() else PLUGIN_LIVE_TEXT
     return f"{PLUGIN_CORE}\n\n{live}"
 

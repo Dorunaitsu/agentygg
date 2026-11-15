@@ -664,7 +664,68 @@ def _here_identity(wait: bool, poll_s: float = BIND_POLL_S, sleep=time.sleep):
             raise SystemExit(0) from None
 
 
+# `ygg listen --hook`: the plugin's listener where Claude Code runs no plugin monitor (the VS Code
+# panel, the desktop app: SDK sessions). Claude Code starts it as an `asyncRewake` hook at
+# session start and after every turn; it waits for one message and exits 2 with it on stderr,
+# which wakes the session even when idle (checked 2026-11-15 in SDK mode). The hook's timeout
+# (plugin hooks.json) is a day; the wait ends a little before, quietly.
+HOOK_WAIT_S = 86_000.0
+HOOK_WAKE = 2
+
+
+def _hook_listen(args) -> None:
+    import signal
+
+    from agentygg.listen import GOT_MESSAGE, fit_delivery, listen, listen_nonce
+
+    with contextlib.suppress(OSError, ValueError):
+        sys.stdin.read()  # the hook's JSON input: not needed
+    if os.environ.get("CLAUDE_CODE_ENTRYPOINT", "cli") in ("", "cli"):
+        raise SystemExit(0)  # the terminal: the plugin's monitor listens there
+    ident = _here_identity(wait=False)
+    if ident is None:
+        raise SystemExit(0)  # a folder of no agent (the next turn's hook looks again)
+    mark = store.state_dir() / f"{ident.agent_id}.hook"
+    with contextlib.suppress(OSError, ValueError):
+        pid = int(mark.read_text().strip())
+        if pid != os.getpid() and store.pid_alive(pid):
+            raise SystemExit(0)  # this session's listener is already waiting
+    mark.parent.mkdir(parents=True, exist_ok=True)
+    mark.write_text(str(os.getpid()))
+
+    def _term(*_):
+        raise KeyboardInterrupt
+
+    with contextlib.suppress(ValueError, OSError):
+        signal.signal(signal.SIGTERM, _term)
+    lines: list[str] = []
+
+    async def go() -> int:
+        gw = Gateway(ident, nonce=listen_nonce(ident.agent_id))
+        try:
+            return await listen(gw, out=lines.append, timeout=HOOK_WAIT_S, retry_cap=30.0)
+        finally:
+            await gw.close()
+
+    try:
+        code = asyncio.run(go())
+    except KeyboardInterrupt:
+        store.clear_listen(ident.agent_id)
+        code = 130
+    finally:
+        with contextlib.suppress(OSError):
+            mark.unlink()
+    messages = [ln for ln in lines if ln.startswith("<agentygg-message")]
+    if code == GOT_MESSAGE and messages:
+        print(fit_delivery(messages), file=sys.stderr, flush=True)
+        raise SystemExit(HOOK_WAKE)
+    raise SystemExit(0)  # nothing, or refused: the next turn's hook tries again
+
+
 def cmd_listen(args) -> None:
+    if getattr(args, "hook", False):
+        _hook_listen(args)
+        return
     if os.environ.get("YGG_RELAY"):
         _fail(
             "ygg listen is for a session a human is having with the agent; this turn was "
@@ -944,6 +1005,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--here",
         action="store_true",
         help="only the agent this folder belongs to; leave quietly when it belongs to none",
+    )
+    a.add_argument(
+        "--hook",
+        action="store_true",
+        help="the Claude Code plugin's hook outside the terminal: wait for one message, exit 2 "
+        "with it (wakes the session)",
     )
     a.set_defaults(fn=cmd_listen)
 

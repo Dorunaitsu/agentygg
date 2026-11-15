@@ -50,6 +50,11 @@ class RestartRequested(Exception):
 RESTART_EXIT = 75
 
 
+# How many refusals (401/403) in a row stop the relay: with the backoff (2 s doubling to 60 s)
+# that is several minutes of a refused sign-in, not a hiccup.
+REFUSALS_BEFORE_STOP = 6
+
+
 @dataclass
 class Relay:
     identity: store.Identity
@@ -183,6 +188,7 @@ class Relay:
                 kind = frame.get("kind")
                 if kind == "hello":
                     self._backoff = 2.0
+                    self._refused = 0
                     log(f"connected as @{self.identity.agent_id}, waiting for messages")
                 elif kind in ("wake", "context"):
                     await self.queue.put(frame)
@@ -212,6 +218,7 @@ class Relay:
         listens for this agent (`ygg listen`), step aside so the two never race for a wake;
         come back once it stops listening."""
         self._backoff = 2.0
+        self._refused = 0
         while True:
             if self._listened():
                 log("paused: a live session is listening for this agent (ygg listen)")
@@ -229,8 +236,19 @@ class Relay:
                     await asyncio.sleep(30)
                     continue
                 if e.status in (401, 403):
-                    log(f"stopped: {e.detail}")
-                    raise
+                    # One refusal is not a verdict: after a sleep or a lost connection the
+                    # gateway refused test-agent's relay once and it stopped for good, though
+                    # the sign-in was fine (2026-11-14). Sign in again and retry; stop only
+                    # when the refusals last.
+                    self._refused += 1
+                    if self._refused >= REFUSALS_BEFORE_STOP:
+                        log(f"stopped: {e.detail} ({self._refused} times in a row)")
+                        raise
+                    self.identity.expires_at = 0.0  # a fresh access token on the next try
+                    log(f"refused ({e.detail}); signing in again, retrying in {self._backoff:.0f}s")
+                    await asyncio.sleep(self._backoff)
+                    self._backoff = min(self._backoff * 2, 60.0)
+                    continue
                 log(f"gateway error ({e.detail}); retrying in {self._backoff:.0f}s")
             except (OSError, TimeoutError) as e:
                 log(f"connection lost ({e.__class__.__name__}); retrying in {self._backoff:.0f}s")

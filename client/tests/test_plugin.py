@@ -3,6 +3,7 @@
 `ygg setup claude --plugin` leaves the MCP server and the skill to the plugin."""
 
 import asyncio
+import io
 import json
 import types
 
@@ -69,7 +70,9 @@ def test_a_one_off_refusal_wakes_nobody_and_a_lasting_one_is_told_once(home):
 
 
 def _listen_args(**kw):
-    base = dict(agent=None, all=False, timeout=0.0, while_pid=None, follow=True, here=True)
+    base = dict(
+        agent=None, all=False, timeout=0.0, while_pid=None, follow=True, here=True, hook=False
+    )
     return types.SimpleNamespace(**{**base, **kw})
 
 
@@ -188,14 +191,57 @@ def test_a_pointer_this_machine_did_not_write_is_ignored(home):
 
 
 def test_the_plugin_tells_each_surface_how_pings_arrive(monkeypatch):
-    """The VS Code panel runs no plugin monitor: there the model listens itself (ygg listen)."""
+    """Messages arrive by themselves everywhere: the monitor in the terminal, a hook in the VS
+    Code panel and the desktop app (SDK sessions, where plugin monitors do not run)."""
+    for entry in ("cli", "claude-vscode", "claude-desktop"):
+        monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", entry)
+        bound = mcp_server.plugin_instructions(True)
+        assert "Run no `ygg listen`" in bound and "/agentygg:agentygg" in bound
+    assert "through a hook" in bound
     monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
-    bound = mcp_server.plugin_instructions(True)
-    assert "Run no `ygg listen`" in bound and "/agentygg:agentygg" in bound  # where the protocol is
-    assert "VS Code" not in mcp_server.plugin_instructions(False)
+    assert "through a hook" not in mcp_server.plugin_instructions(True)
+
+
+def test_the_hook_listener_stays_out_of_the_terminal_and_of_foreign_folders(home, monkeypatch):
+    store.save(store.Identity("solo", "lab"))
+    store.write_pointer(home, "solo")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")  # the monitor listens there
+    with pytest.raises(SystemExit) as e:
+        cli.cmd_listen(_listen_args(hook=True))
+    assert e.value.code == 0
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "claude-desktop")
+    (home / ".agentygg").write_text("other\n")  # not what this machine recorded
+    with pytest.raises(SystemExit) as e:
+        cli.cmd_listen(_listen_args(hook=True))
+    assert e.value.code == 0
+
+
+def test_the_hook_wakes_the_session_with_the_message(home, monkeypatch, capsys):
+    store.save(store.Identity("solo", "lab"))
+    store.write_pointer(home, "solo")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "claude-vscode")
-    assert "run `ygg listen` as a background command" in mcp_server.plugin_instructions(True)
-    assert "VS Code panel" in mcp_server.plugin_instructions(False)
+
+    async def fake_listen(gw, out, **_kw):
+        out(_rendered("une question pour toi", "msg_q"))
+        return lst.GOT_MESSAGE
+
+    class FakeGateway:
+        def __init__(self, *_a, **_k):
+            pass
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(lst, "listen", fake_listen)
+    monkeypatch.setattr(cli, "Gateway", FakeGateway)
+    with pytest.raises(SystemExit) as e:
+        cli.cmd_listen(_listen_args(hook=True))
+    assert e.value.code == 2  # asyncRewake wakes Claude on exit code 2, with stderr
+    err = capsys.readouterr().err
+    assert err.startswith(lst.FOLLOW_LEAD) and "une question pour toi" in err
+    assert not (store.state_dir() / "solo.hook").exists()  # the next turn may arm it again
 
 
 def test_the_plugin_instructions_fit_what_claude_code_keeps(monkeypatch):
