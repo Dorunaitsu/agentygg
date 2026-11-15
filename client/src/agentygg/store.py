@@ -67,19 +67,46 @@ _refresh_lock = threading.Lock()
 
 @contextlib.contextmanager
 def _agent_lock(agent_id: str):
-    try:
-        import fcntl
-    except ImportError:  # Windows: the in-process lock only
-        yield
-        return
     d = agents_dir()
     d.mkdir(parents=True, exist_ok=True)
+    try:
+        import fcntl
+    except ImportError:  # Windows
+        with _windows_lock(d / f".{agent_id}.lock"):
+            yield
+        return
     with open(d / f".{agent_id}.lock", "w") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
             yield
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def _windows_lock(path: Path, wait_s: float = 60.0):
+    """An exclusive lock across processes on Windows (msvcrt locks one byte of the file). With
+    the Claude Code plugin an agent has several processes that may refresh its sign-in (relay,
+    MCP server, listener); a refresh token works once, so they must take turns (2026-11-15)."""
+    import msvcrt
+
+    with open(path, "a+b") as f:
+        deadline = time.monotonic() + wait_s
+        while True:
+            try:
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                break
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(0.1)
+        try:
+            yield
+        finally:
+            f.seek(0)
+            with contextlib.suppress(OSError):
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def bearer(identity: Identity, now=time.time, http=None) -> str:

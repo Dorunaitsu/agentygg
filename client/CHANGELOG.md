@@ -3,6 +3,13 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.8 (2026-11-15)
+
+- **Windows:** the processes of one agent (relay, the plugin's MCP server and listener, `ygg
+  send`) now take turns to refresh its sign-in, as on macOS and Linux. Without the lock, two
+  refreshing at once could end the sign-in (a refresh token works once), which the Claude Code
+  plugin made likelier.
+
 ## 0.7.7 (2026-11-15)
 
 - **Live messages in the VS Code panel and the desktop app too**, with nothing for the model to

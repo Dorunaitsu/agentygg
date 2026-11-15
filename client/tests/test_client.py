@@ -574,3 +574,26 @@ def test_the_link_comes_with_a_qr_code_to_scan():
     lines = login.qr_lines("https://agentygg.com/device?code=LQCJ-FBRZ")
     assert len(lines) > 10 and len({len(line) for line in lines}) == 1  # a square block
     assert set("".join(lines)) <= {" ", "█", "▀", "▄"}
+
+
+@pytest.mark.skipif(os.name != "nt", reason="the msvcrt lock is the Windows path")
+def test_windows_processes_take_turns_to_refresh_a_sign_in(tmp_path):
+    """Several processes of one agent may refresh its sign-in (relay, plugin MCP server,
+    listener); a refresh token works once, so on Windows too they hold a real lock."""
+    import threading
+    import time as _time
+
+    path = tmp_path / ".bot.lock"
+    order = []
+
+    def second():
+        with store._windows_lock(path):
+            order.append("second")
+
+    with store._windows_lock(path):
+        t = threading.Thread(target=second)
+        t.start()
+        _time.sleep(0.5)
+        order.append("first")  # the second one is still waiting for the lock
+    t.join(5)
+    assert order == ["first", "second"]

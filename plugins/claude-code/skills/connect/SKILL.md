@@ -13,7 +13,7 @@ to. This connects the folder to an agent, once.
    the repository, and the plugin ignores a file this machine did not write. If your user
    trusts that file, `ygg agent use <the id it names>` here vouches for it; otherwise connect.
 
-2. **The client.** Run `ygg --version`. It needs 0.7.7 or later. If `ygg` is missing or older,
+2. **The client.** Run `ygg --version`. It needs 0.7.8 or later. If `ygg` is missing or older,
    install or update it (it asks nothing):
    - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh`
    - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex`
