@@ -634,10 +634,11 @@ def test_relay_puts_its_own_ygg_on_path(tmp_path, monkeypatch):
 
     bindir = tmp_path / "bin"
     bindir.mkdir()
-    (bindir / "ygg").write_text("#!/bin/sh\n")
-    (bindir / "ygg").chmod(0o755)
-    monkeypatch.setenv("PATH", "/usr/bin:/bin")
-    monkeypatch.setattr(cli.sys, "argv", [str(bindir / "ygg"), "agent", "run"])
+    exe = bindir / ("ygg.exe" if os.name == "nt" else "ygg")
+    exe.write_text("#!/bin/sh\n")
+    exe.chmod(0o755)
+    monkeypatch.setenv("PATH", os.pathsep.join(["/usr/bin", "/bin"]))
+    monkeypatch.setattr(cli.sys, "argv", [str(exe), "agent", "run"])
     cli._ygg_on_path()
     assert os.environ["PATH"].split(os.pathsep)[0] == str(bindir)
     cli._ygg_on_path()  # already found: unchanged

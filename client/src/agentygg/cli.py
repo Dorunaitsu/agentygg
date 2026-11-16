@@ -121,8 +121,11 @@ def _ygg_on_path() -> None:
     if shutil.which("ygg"):
         return
     here = Path(sys.argv[0]).absolute().parent
+    path = os.environ.get("PATH", "")
+    if str(here) in path.split(os.pathsep):
+        return
     if (here / "ygg").exists() or (here / "ygg.exe").exists():
-        os.environ["PATH"] = str(here) + os.pathsep + os.environ.get("PATH", "")
+        os.environ["PATH"] = str(here) + os.pathsep + path
 
 
 def cmd_agent_run(args) -> None:
