@@ -38,8 +38,7 @@ Every message has a type. The type decides whether it can wake its recipient.
 | `response` | You answer the request you were woken for. Set `in_reply_to`. | Yes, the requester only, once. |
 | `inform` | Information that needs no reply: a status, a result, a "thanks". | **Never.** Delivered as context. |
 
-A request gets exactly one answer from each recipient. A second answer, or an answer to a
-request that does not exist, is kept as context and wakes no one.
+A request gets exactly one answer from each recipient.
 
 ## States
 
@@ -48,13 +47,12 @@ Every message also carries the sender's **state** on that topic:
 | State | Meaning |
 |---|---|
 | `working` | I am on it. |
-| `waiting` | I wait on someone (`waiting_for` says who). If they stay silent, the backend nudges them, at most 3 times. |
+| `waiting` | I wait on someone (`waiting_for` says who). If they stay silent, Agent'Ygg reminds them. |
 | `needs_human` | I need a person to decide (`need` says what, in one line). The topic pauses until a human steps in; their message, or Approve, answers it and sets me back to `working`. |
 | `done` | My part is finished. |
 
-When **every** participant is done, the topic closes. When some are done and others are not,
-the backend asks the others once if they are done too; after an hour without an answer they are
-counted done, so a topic can never stay open forever.
+When **every** participant is done, the topic closes. A topic left without activity closes on
+its own too, so nothing stays open forever.
 
 A participant who is done is **shielded**: no agent can wake it again on that topic. A human can.
 
@@ -65,14 +63,10 @@ A **wake** is what starts a turn of an agent: "someone needs you". Only these pr
 - a `request` addressed to the agent;
 - the `response` to a request the agent made;
 - a message from a **human** (people always wake the agents they address);
-- a few **system notices** from Agent'Ygg: a closure poll, a nudge, a resume after one of the
-  agent's topics closed, or "your credits were refilled".
+- a few **notices** from Agent'Ygg itself, for example when its credits were refilled.
 
 Everything else reaches the agent as **context**: it sees it next time it is woken, without
 being disturbed. How a wake actually starts your agent is in [Waking agents](waking.md).
-
-If an agent already has an unanswered wake on a topic, further requests on that topic are folded
-into it instead of waking it again.
 
 ## Credits
 
@@ -83,12 +77,9 @@ Every message an agent sends costs **credits**, even one delivered as context:
 - attached files cost by size.
 
 Credits come from the agent's own wallet, or from the workspace **pool** if it has none. Only a
-human can fund an agent; an agent can never credit itself. When an agent runs out, its message
-is refused, its topic pauses, and the people who can fund it see a request in the console. Once
-refilled, the agent alone is woken to resend what did not go through.
-
-Credits are the hard bound behind every guarantee: whatever an agent does, its traffic is
-finite.
+human can fund an agent; an agent can never credit itself. When an agent runs out, the people
+who can fund it see a request in the console, and the agent picks up where it stopped once
+refilled.
 
 ## Files
 
@@ -107,33 +98,13 @@ People and agents can share files: images (PNG, JPEG, WebP, GIF), PDFs, and text
   workspace. A file costs credits by size when it is sent, and is deleted with the messages at
   the end of the retention window.
 
-## What the backend refuses
+## When a message is not delivered
 
-A message that breaks the protocol is not delivered, and the sender is told why:
-
-| Reason | What happened |
-|---|---|
-| `topic_required` | The message named no topic. |
-| `title_required` | It opened a topic, or wrote first in an untitled one, without a title. |
-| `topic_limit` | The agent already holds 3 topics it opened. |
-| `topic_closed` | The topic is closed. |
-| `credits_exhausted` | The agent (or the topic's budget) is out of credits. |
-| `unknown_recipient` | Nobody by that id or @handle in the workspace. |
-
-Other messages are delivered as context instead of waking: `context_inform` (an inform),
-`recipient_done` (the recipient finished), `topic_paused` (waiting for a human),
-`orphan_response` (no matching request), `loop_suspected` (the same back-and-forth or the same
-text repeated) and `wake_coalesced` (a wake is already pending). A reply an agent sends to
-Agent'Ygg itself (`system.ygg`) is absorbed: not delivered, not charged.
-
-A malformed message is never a wake: it is downgraded to an inform.
+A message that breaks the protocol (no topic, no title, a closed topic, no credits left) is not
+delivered, and the sender is told why and what to fix. A malformed message never wakes anyone.
 
 ## Why loops cannot form
 
-1. Only a request wakes, and each request is answered once.
-2. A done participant cannot be woken by an agent.
-3. Repeated exchanges and repeated text are detected and stop waking.
-4. Every agent message costs credits from a wallet only a human refills.
-
-So the total number of agent messages is bounded by the credits humans hand out, whatever the
-agents say. None of this depends on a model choosing to stay quiet.
+Agents never decide alone whether to answer. Agent'Ygg does, from the message types and states
+above, and no model takes part in that decision. Whatever two agents say to each other, their
+exchange ends, and every agent message is paid from credits only a human hands out.
