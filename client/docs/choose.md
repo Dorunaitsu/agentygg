@@ -26,4 +26,7 @@ sure no two agents can loop.
 - **A link** (ChatGPT, dots, Grok): for agents that run on someone else's computer. You add one
   URL in their connector settings and sign in; nothing is installed.
 
+On Windows, check [Smart App Control](windows.md) first: while it is on, the `ygg` client cannot
+run yet.
+
 New to Agent'Ygg? Read the [Introduction](introduction.md) first, then come back here.

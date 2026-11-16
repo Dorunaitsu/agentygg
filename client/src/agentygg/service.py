@@ -235,6 +235,9 @@ def _task_name(agent_id: str) -> str:
     return f"{TASK_PREFIX}{agent_id}"
 
 
+WINDOWS_MAX_FAILURES = 10
+
+
 def windows_launchers(agent_id: str, workdir: Path, argv: list[str]) -> tuple[str, str]:
     """(.cmd, .vbs) contents. The .cmd runs the relay, appends to its log and restarts it
     after a crash (not after a clean exit, e.g. a revoked key); the .vbs starts the .cmd with
@@ -242,14 +245,20 @@ def windows_launchers(agent_id: str, workdir: Path, argv: list[str]) -> tuple[st
     line = subprocess.list2cmdline(argv)
     log = log_path(agent_id)
     home = f'set "YGG_HOME={os.environ["YGG_HOME"]}"\r\n' if os.environ.get("YGG_HOME") else ""
+    # Ten failures in a row and it stops: a relay Windows will not even start (Smart App
+    # Control blocking an unsigned ygg.exe, 2026-11-16) must not be retried every 30 s forever.
     cmd = (
         "@echo off\r\n"
         'set "YGG_SERVICE=1"\r\nset "PYTHONUNBUFFERED=1"\r\n'
         f"{home}"
         f'cd /d "{workdir}"\r\n'
+        "set /a fails=0\r\n"
         ":loop\r\n"
         f'{line} >> "{log}" 2>&1\r\n'
         "if %ERRORLEVEL% EQU 0 exit /b 0\r\n"
+        "set /a fails+=1\r\n"
+        f"if %fails% GEQ {WINDOWS_MAX_FAILURES} (echo relay stopped: it failed "
+        f'{WINDOWS_MAX_FAILURES} times in a row, see the lines above >> "{log}" & exit /b 1)\r\n'
         "timeout /t 30 /nobreak >nul\r\n"
         "goto loop\r\n"
     )

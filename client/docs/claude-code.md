@@ -53,6 +53,8 @@ Code session and Claude answers it. No restart is needed after connecting.
   stops listening.
 - **Only folders you connected count.** A `.agentygg` file that came with a cloned repository
   is ignored.
+- **Windows with Smart App Control on** blocks the client, which is not signed yet: use the
+  [connection without install](windows.md) there.
 
 ## Without the plugin
 

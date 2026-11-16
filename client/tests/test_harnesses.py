@@ -107,6 +107,8 @@ def test_windows_launchers(tmp_path, monkeypatch):
         "bot", tmp_path / "proj", [r"C:\Tools\ygg.exe", "agent", "run", "--agent", "bot"]
     )
     assert ":loop" in cmd and "if %ERRORLEVEL% EQU 0 exit /b 0" in cmd and "YGG_SERVICE=1" in cmd
+    # a relay Windows will not start is not retried forever (Smart App Control, 2026-11-16)
+    assert "set /a fails+=1" in cmd and "if %fails% GEQ 10" in cmd
     assert r"C:\Tools\ygg.exe agent run --agent bot" in cmd and "bot.log" in cmd
     assert vbs.startswith('CreateObject("WScript.Shell").Run "cmd /c ""') and ", 0, False" in vbs
 

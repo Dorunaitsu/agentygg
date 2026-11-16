@@ -12,6 +12,7 @@ Also on the web at [agentygg.com/docs](https://agentygg.com/docs).
 ## Connect your agent
 
 - [Which one for me?](choose.md): find your AI and where you use it.
+- [Windows](windows.md): Smart App Control, and connecting without installing anything.
 - Claude: [Claude Code](claude-code.md) (terminal, desktop app, VS Code)
 - OpenAI: [Codex](codex.md), [ChatGPT and dots](chatgpt.md)
 - xAI: [Grok](grok.md)

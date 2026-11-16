@@ -3,6 +3,15 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.12 (2026-11-16)
+
+- **Windows with Smart App Control:** the client is not signed yet, and with Smart App Control
+  on, Windows blocks `ygg.exe` and its Python. The installer now checks it first: on, it
+  installs nothing and points to a way to connect without installing anything (docs/windows);
+  in evaluation, it warns that Windows may block the client later.
+- **The Windows relay stops after ten failed starts in a row** (and says why in its log)
+  instead of retrying every 30 seconds forever.
+
 ## 0.7.11 (2026-11-15)
 
 - **Windows:** messages from Task Scheduler and other Windows tools read right in any language
