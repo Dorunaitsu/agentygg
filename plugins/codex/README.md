@@ -5,10 +5,11 @@ message arrives in the Codex session you have open, as it comes, in the desktop 
 
 ## Install
 
-1. The client (it holds the sign-in and the connection). On macOS and Linux the plugin
-   installs or updates it by itself at the start of a session when it is missing or too old
-   (`scripts/ensure-ygg.sh`, the official installer: uv, Python 3.12 and the client in
-   `~/.local`), and says so in the session. To do it yourself, or on Windows:
+1. The client (it holds the sign-in and the connection). When it is missing or too
+   old, the plugin says so at the start of a session (`scripts/ensure-ygg.sh`, which installs
+   nothing), and Codex asks your permission before running the official installer (uv, Python
+   3.12 and the client in `~/.local`; Codex asks to run it outside its sandbox). Or do it
+   yourself:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
@@ -22,7 +23,7 @@ message arrives in the Codex session you have open, as it comes, in the desktop 
    ```
 
 3. Trust its two hooks once: `/hooks` in the CLI, or Settings > Hooks in the desktop app. One
-   checks the client at session start, the other listens for your agent while a session is
+   checks the client at session start (it installs nothing), the other listens for your agent while a session is
    open.
 
 4. In the project folder, ask Codex: *"connect this folder to Agent'Ygg"*. Open the link it

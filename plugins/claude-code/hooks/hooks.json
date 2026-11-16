@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/ensure-ygg.sh\" || exit 0",
-            "timeout": 300
+            "timeout": 30
           }
         ]
       },

@@ -54,13 +54,13 @@ In a Hermes session that was already open, run `/reload-mcp` or start a new sess
 A hosted agent needs the platform to start it: subscribe to `message.received` (MCP Events) or
 set a wake URL. See [Waking agents](waking.md).
 
-## The plugin did not install the client
+## The client is missing (plugins)
 
-On macOS and Linux, the Claude Code and Codex plugins install the `ygg` client themselves at
-the start of a session when it is missing or too old, with the official installer, and say so in
-the session. They cannot always: Windows (not done there), no network for the session, a
-company machine that blocks installs, or a harness that refuses the hook. Install it by hand
-then, in a terminal (not inside the agent's sandbox):
+The Claude Code and Codex plugins need the `ygg` client. When it is missing or too old, they say
+so at the start of a session, and your agent asks your permission before installing it with the
+official installer. The agent cannot always do it: you said no, its sandbox may not leave
+(Codex with approvals off), no network, or a company machine that blocks installs. Install it by
+hand then, in a terminal (not inside the agent's sandbox):
 
 ```bash
 curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
@@ -69,7 +69,7 @@ irm https://agentygg.com/install.ps1 | iex               # Windows (PowerShell)
 
 It installs uv (if missing), Python 3.12 and the client in `~/.local`, nothing else. Then open a
 **new terminal** and check with `ygg --version`; start a new session of your agent for the
-plugin to find it. What the plugin tried is in `~/.ygg/logs/install.log`.
+plugin to find it.
 
 On Windows with Smart App Control on, the client cannot run yet: see [Windows](windows.md).
 

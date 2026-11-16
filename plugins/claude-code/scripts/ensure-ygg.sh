@@ -1,58 +1,37 @@
 #!/bin/sh
-# Agent'Ygg plugin, at session start: make sure the `ygg` client this plugin runs is installed.
+# Agent'Ygg plugin, at session start: check that the `ygg` client this plugin runs is there.
 #
-# - `ygg` there, at MIN or later: nothing happens (one `ygg --version`).
-# - Missing, or older than MIN: installed or updated with the official installer
-#   (https://agentygg.com/install.sh: uv, Python 3.12 and the client, in ~/.local), and the
-#   session is told so. Never anything else on the machine.
-# - Windows: nothing is installed here; install it by hand (docs/troubleshooting).
+# - `ygg` there, at MIN or later: nothing is said (one `ygg --version`).
+# - Missing, or older than MIN: nothing is installed. The session is told, and the agent asks
+#   its user before installing it with the official installer (the harness's own approval
+#   prompt is the consent: Codex's sandbox escalation, Claude Code's permission prompt).
+# - Windows: the same notice, with the PowerShell installer.
 #
-# Whatever happens, it exits 0 (a failure is said, not raised): the session goes on.
+# It always exits 0: the session goes on.
 MIN="0.7.14"
-LOG="$HOME/.ygg/logs/install.log"
+[ -n "${YGG_RELAY:-}" ] && exit 0  # a turn the relay started: the client is there
 
 case "$(uname -s 2>/dev/null)" in
-  Darwin|Linux) ;;
-  *) exit 0 ;;
+  Darwin|Linux) CMD="curl -fsSL https://agentygg.com/install.sh | sh" ;;
+  *) CMD="irm https://agentygg.com/install.ps1 | iex   (in PowerShell)" ;;
 esac
-[ -n "${YGG_RELAY:-}" ] && exit 0  # a turn the relay started: the client is there
 
 YGG="$(command -v ygg 2>/dev/null || true)"
 [ -z "$YGG" ] && [ -x "$HOME/.local/bin/ygg" ] && YGG="$HOME/.local/bin/ygg"
 if [ -n "$YGG" ]; then
   have="$("$YGG" --version 2>/dev/null | awk '{print $2}')"
   if [ -n "$have" ] && awk -v a="$have" -v b="$MIN" 'BEGIN {
-      n = split(a, x, "."); m = split(b, y, ".")
+      split(a, x, "."); split(b, y, ".")
       for (i = 1; i <= 3; i++) { if (x[i] + 0 > y[i] + 0) exit 0; if (x[i] + 0 < y[i] + 0) exit 1 }
       exit 0 }'; then
     exit 0
   fi
-  what="updated the ygg client from $have"
+  state="is $have, older than the $MIN this plugin needs"
+  what="update it"
 else
-  what="installed the ygg client"
+  state="is not installed"
+  what="install it"
 fi
 
-# One install at a time (several sessions may start together).
-mkdir -p "$HOME/.ygg/logs"
-LOCK="$HOME/.ygg/install.lock"
-if ! mkdir "$LOCK" 2>/dev/null; then
-  exit 0
-fi
-trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
-
-# Downloaded first, then run: piped, a failed download would look like a successful install.
-SETUP="$HOME/.ygg/install.sh"
-now=""
-if curl -fsSL -o "$SETUP" https://agentygg.com/install.sh >"$LOG" 2>&1 \
-  && sh "$SETUP" >>"$LOG" 2>&1; then
-  for y in "$HOME/.local/bin/ygg" "$(command -v ygg 2>/dev/null)"; do
-    [ -n "$y" ] && [ -x "$y" ] && now="$("$y" --version 2>/dev/null)" && [ -n "$now" ] && break
-  done
-fi
-rm -f "$SETUP"
-if [ -n "$now" ]; then
-  echo "Agent'Ygg plugin: $what ($now), with the official installer (log: $LOG). Tell your user, and that the Agent'Ygg tools and live messages need a new session now."
-else
-  echo "Agent'Ygg plugin: could not install the ygg client automatically (log: $LOG). Tell your user to install it by hand: curl -fsSL https://agentygg.com/install.sh | sh  (more: https://agentygg.com/docs/troubleshooting)."
-fi
+echo "Agent'Ygg plugin: the ygg client $state, so the Agent'Ygg tools and live messages cannot work yet. Nothing was installed. Before anything else Agent'Ygg-related, ask your user whether you may $what with the official installer (it puts uv, Python 3.12 and the client in ~/.local, nothing else): $CMD . With their yes, run that command, outside any sandbox (it needs the network and ~/.local, so your harness asks them to approve it). If they say no, or it cannot run here, they install it in a terminal themselves (https://agentygg.com/docs/troubleshooting). Then they start a new session."
 exit 0

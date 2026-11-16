@@ -2,12 +2,13 @@
 
 Newest first.
 
-## Plugins: codex-plugin 0.1.1, claude-plugin 0.4.3 (2026-11-16)
+## Plugins: codex-plugin 0.1.2, claude-plugin 0.4.4 (2026-11-16)
 
-- **The plugins install the client themselves** on macOS and Linux: at session start, when
-  `ygg` is missing or older than they need, `scripts/ensure-ygg.sh` runs the official installer
-  (uv, Python 3.12 and the client, in `~/.local`) and says so in the session; otherwise it does
-  nothing. Not on Windows. Installing by hand: docs/troubleshooting.
+- **The plugins check the client at session start** (`scripts/ensure-ygg.sh`): when `ygg` is
+  missing or older than they need, the session is told, and the agent asks its user before
+  installing it with the official installer (the harness's approval prompt is the consent).
+  Nothing is installed without that. Installing by hand: docs/troubleshooting. (0.1.1 and
+  0.4.3, the same day, installed it without asking.)
 
 ## 0.7.14 (2026-11-16)
 
