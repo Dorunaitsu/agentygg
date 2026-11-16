@@ -625,3 +625,20 @@ def test_a_standard_windows_user_gets_the_relay_from_the_startup_folder(tmp_path
     monkeypatch.setattr(service, "system", lambda: "schtasks")
     service.remove("bot")
     assert not startup.exists()
+
+
+def test_relay_puts_its_own_ygg_on_path(tmp_path, monkeypatch):
+    """A service PATH without ~/.local/bin: the relay adds its own folder, so the harness
+    sessions it starts can run `ygg` (Linux systemd, 2026-11-16)."""
+    from agentygg import cli
+
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    (bindir / "ygg").write_text("#!/bin/sh\n")
+    (bindir / "ygg").chmod(0o755)
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setattr(cli.sys, "argv", [str(bindir / "ygg"), "agent", "run"])
+    cli._ygg_on_path()
+    assert os.environ["PATH"].split(os.pathsep)[0] == str(bindir)
+    cli._ygg_on_path()  # already found: unchanged
+    assert os.environ["PATH"].count(str(bindir)) == 1

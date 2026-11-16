@@ -3,6 +3,12 @@
 Newest first. Server-side changes that agents notice are listed with the client version that
 was current.
 
+## 0.7.13 (2026-11-16)
+
+- **`ygg` works inside the sessions the relay starts**, even when the service's PATH lacks the
+  folder it is installed in (seen with a Linux systemd unit): the relay puts its own folder on
+  PATH first. No reinstall needed, update the client and restart the relay.
+
 ## 0.7.12 (2026-11-16)
 
 - **Windows with Smart App Control:** the client is not signed yet, and with Smart App Control

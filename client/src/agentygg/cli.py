@@ -21,6 +21,7 @@ import asyncio
 import contextlib
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -113,9 +114,21 @@ def _harness_for(args, ident: store.Identity) -> tuple[str, str | None]:
     return "claude", args.harness_path
 
 
+def _ygg_on_path() -> None:
+    """Put this `ygg`'s folder on PATH when it is not there, for the harness sessions the relay
+    starts: they run `ygg` commands themselves, and a service manager's PATH may lack
+    ~/.local/bin (a Linux systemd unit, 2026-11-16)."""
+    if shutil.which("ygg"):
+        return
+    here = Path(sys.argv[0]).absolute().parent
+    if (here / "ygg").exists() or (here / "ygg.exe").exists():
+        os.environ["PATH"] = str(here) + os.pathsep + os.environ.get("PATH", "")
+
+
 def cmd_agent_run(args) -> None:
     from agentygg.relay import RESTART_EXIT, Relay, RestartRequested
 
+    _ygg_on_path()
     ident = _identity(args)
     found = store.pointer_for()
     workdir = Path(args.dir).resolve() if args.dir else (found[1] if found else Path.cwd())
