@@ -754,8 +754,15 @@ def _hook_listen(args) -> None:
 
     with contextlib.suppress(OSError, ValueError):
         sys.stdin.read()  # the hook's JSON input: not needed
-    if os.environ.get("CLAUDE_CODE_ENTRYPOINT", "cli") in ("", "cli"):
-        raise SystemExit(0)  # the terminal: the plugin's monitor listens there
+    if os.environ.get("YGG_RELAY"):
+        # A turn the relay started (`claude -p --resume`): the relay delivers there. Listening
+        # here took a message the turn never saw, and held the turn open after its answer, the
+        # relay pausing for its own child (Claudeo, 2026-11-16).
+        raise SystemExit(0)
+    if os.environ.get("CLAUDE_CODE_ENTRYPOINT", "cli") in ("", "cli", "sdk-cli"):
+        # The terminal (the plugin's monitor listens there), or a one-shot `claude -p` that
+        # nobody is watching.
+        raise SystemExit(0)
     ident = _here_identity(wait=False)
     if ident is None:
         raise SystemExit(0)  # a folder of no agent (the next turn's hook looks again)

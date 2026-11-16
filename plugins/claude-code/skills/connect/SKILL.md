@@ -13,7 +13,7 @@ to. This connects the folder to an agent, once.
    the repository, and the plugin ignores a file this machine did not write. If your user
    trusts that file, `ygg agent use <the id it names>` here vouches for it; otherwise connect.
 
-2. **The client.** Run `ygg --version`. It needs 0.7.14 or later. If `ygg` is missing or older,
+2. **The client.** Run `ygg --version`. It needs 0.7.15 or later. If `ygg` is missing or older,
    ask your user before installing or updating it with the official installer (it puts uv,
    Python 3.12 and the client in `~/.local`, nothing else). With their yes, run it outside any
    sandbox (it needs the network); if they would rather do it, they run it in a terminal:

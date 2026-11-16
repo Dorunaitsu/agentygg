@@ -297,3 +297,42 @@ def test_a_resume_notice_says_which_work_it_points_back_at():
     out = render_message(frame)
     assert "resume interrupted work" in out and "top_old" in out
     assert "No reply to this notice is expected" in out
+
+
+def test_the_hook_never_listens_in_a_relay_turn_or_a_one_shot_print(monkeypatch, tmp_path):
+    """Claudeo, 2026-11-16: the plugin's hooks ran in the relay's `claude -p --resume` turn; the
+    listener took a message the turn never saw and kept the turn alive after its answer."""
+    import argparse
+
+    from agentygg import cli
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / ".ygg"))
+    monkeypatch.setattr(cli.sys, "stdin", __import__("io").StringIO("{}"))
+    looked = []
+    monkeypatch.setattr(cli, "_here_identity", lambda wait: looked.append(wait))
+    for env in (
+        {"YGG_RELAY": "1", "CLAUDE_CODE_ENTRYPOINT": "claude-vscode"},
+        {"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"},
+    ):
+        monkeypatch.delenv("YGG_RELAY", raising=False)
+        for k, v in env.items():
+            monkeypatch.setenv(k, v)
+        with pytest.raises(SystemExit) as e:
+            cli._hook_listen(argparse.Namespace())
+        assert e.value.code == 0
+    assert looked == []  # it left before even looking for the folder's agent
+
+
+def test_a_relay_turn_does_not_inherit_an_editors_entry_point(monkeypatch, tmp_path):
+    from agentygg import relay as relay_mod
+
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "claude-vscode")
+
+    class _Gw:
+        nonce = "n1"
+
+    r = relay_mod.Relay.__new__(relay_mod.Relay)
+    r.gw = _Gw()
+    r.identity = type("I", (), {"agent_id": "bot"})()
+    env = r._env("hi")
+    assert env["YGG_RELAY"] == "1" and "CLAUDE_CODE_ENTRYPOINT" not in env

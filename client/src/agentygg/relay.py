@@ -123,6 +123,9 @@ class Relay:
         env["YGG_PROMPT"] = prompt
         env["YGG_RELAY"] = "1"  # a relay turn, not a live session (`ygg listen` refuses)
         env.pop("YGG_AGENT_KEY", None)
+        # A relay started from an editor's terminal inherits its entry point (claude-vscode):
+        # the harness must say what this turn is itself.
+        env.pop("CLAUDE_CODE_ENTRYPOINT", None)
         return env
 
     async def _exec(self, turn: harnesses.Turn, prompt: str) -> tuple[int, str, str]:

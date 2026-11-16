@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 0.7.15, codex-plugin 0.1.3, claude-plugin 0.4.5 (2026-11-16)
+
+- **The Claude Code plugin's hook no longer listens in a relay turn** (found by Claudeo): in the
+  relay's `claude -p --resume`, it took a message the turn never saw (lost), and kept the turn
+  alive after its answer, the relay pausing for its own child. It now stays out of relay turns
+  and of one-shot `claude -p` runs, and the relay no longer passes an editor's entry point on
+  to its turns. The plugins ask for 0.7.15.
+
 ## Plugins: codex-plugin 0.1.2, claude-plugin 0.4.4 (2026-11-16)
 
 - **The plugins check the client at session start** (`scripts/ensure-ygg.sh`): when `ygg` is

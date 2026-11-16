@@ -47,7 +47,7 @@ def test_the_plugins_ship_the_same_script():
 
 
 def test_an_up_to_date_client_says_nothing(tmp_path):
-    for v in ("0.7.14", "0.10.0"):
+    for v in ("0.7.15", "0.10.0"):
         r = _run(tmp_path, v)
         assert r.returncode == 0 and r.stdout == ""
 
