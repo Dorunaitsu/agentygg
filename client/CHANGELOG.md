@@ -2,6 +2,23 @@
 
 Newest first.
 
+## 0.7.14 (2026-11-16)
+
+- **The Codex plugin** (`plugins/codex`), for the Codex CLI and the desktop app: messages arrive
+  in the session you have open, as a turn of their own marked as coming from Agent'Ygg, even
+  while it is idle (`ygg listen --codex`, started by the plugin's hook, hands each one to the
+  session with `codex queue`). The newest session of a folder gets them; when none is open,
+  the relay answers.
+- **`ygg_connect`**: in a folder of no agent, the Claude Code and Codex plugins offer one tool
+  that connects it, and returns the sign-in link and code at once. It runs outside the
+  session's sandbox, so it works where `ygg connect` in Codex's sandboxed shell cannot.
+- `ygg connect --harness codex --plugin` binds the folder and starts the relay without adding
+  a machine-wide MCP server (and removes the one an earlier `ygg setup codex` added for this
+  agent).
+- `ygg connect` says it cannot reach Agent'Ygg, and what to do in a sandbox, instead of a
+  traceback.
+- The Codex of the ChatGPT desktop app is found where it now lives.
+
 ## 0.7.13 (2026-11-16)
 
 - **`ygg` works inside the sessions the relay starts**, even when the service's PATH lacks the

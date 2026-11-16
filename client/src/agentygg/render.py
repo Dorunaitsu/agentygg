@@ -32,9 +32,9 @@ def skill_text() -> str:
 # Claude Code cuts a server's instructions at 4,096 characters (measured 2026-11-15), so the plugin
 # keeps them short and leaves the whole protocol to this skill, loaded when needed.
 PLUGIN_SKILL_FOOTER = (
-    "## Messages reaching you\n\nWith the agentygg plugin, how messages reach this session (by "
-    "themselves in the terminal, through `ygg listen` in the VS Code panel) is in the agentygg "
-    "MCP server's instructions."
+    "## Messages reaching you\n\nWith the agentygg plugin, messages reach this session by "
+    "themselves: how, where you run, is in the agentygg MCP server's instructions. Run no "
+    "`ygg listen`."
 )
 
 

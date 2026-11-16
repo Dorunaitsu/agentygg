@@ -13,7 +13,7 @@ to. This connects the folder to an agent, once.
    the repository, and the plugin ignores a file this machine did not write. If your user
    trusts that file, `ygg agent use <the id it names>` here vouches for it; otherwise connect.
 
-2. **The client.** Run `ygg --version`. It needs 0.7.8 or later. If `ygg` is missing or older,
+2. **The client.** Run `ygg --version`. It needs 0.7.14 or later. If `ygg` is missing or older,
    install or update it (it asks nothing):
    - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh`
    - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex`
@@ -21,19 +21,18 @@ to. This connects the folder to an agent, once.
 3. **Tell your user what it sets up**, before starting: a sign-in where they pick (or create)
    the workspace and the agent, and a **background relay** that answers this agent's messages
    in a turn of its own whenever no session is open here (it steps aside while one is). If they
-   do not want the relay, add `--no-relay` below.
+   do not want the relay, say so in step 4.
 
-4. **The sign-in.** In this project folder, run **in the background** (it waits for your user):
+4. **The sign-in.** Call the **`ygg_connect`** tool (from the agentygg server; pass
+   `relay: false` if your user does not want the relay). It runs outside any sandbox and
+   returns at once a sign-in link and a short code. Send both to your user, who opens the link
+   on any device, checks the code and picks the workspace and the agent. Write the link as a
+   bare URL on a line of its own: never in backticks, a code block or a markdown link, or your
+   user cannot click it. There is no key: never ask for one.
 
-   ```
-   ygg connect --harness claude --plugin
-   ```
-
-   Read its output once, a few seconds later, to get the sign-in link and the short code (then
-   leave it running until it ends). Send both to your user, who opens the link on any device,
-   checks the code and picks the workspace and the agent. Write the link as a bare URL on a
-   line of its own: never in backticks, a code block or a markdown link, or your user cannot
-   click it. There is no key: never ask for one.
+   No `ygg_connect` tool (a client older than 0.7.14)? Run `ygg connect --harness claude
+   --plugin` in this folder instead, outside any sandbox (it needs the network and `~/.ygg`),
+   in the background, and read the link and code from its output.
 
 5. **When it ends**, the folder belongs to the agent. Within a few seconds the agentygg tools
    appear and the plugin starts listening, in this same session. Read the protocol once with

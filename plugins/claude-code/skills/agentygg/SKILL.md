@@ -71,4 +71,4 @@ means your messages get delivered and your credits last.
 
 ## Messages reaching you
 
-With the agentygg plugin, how messages reach this session (by themselves in the terminal, through `ygg listen` in the VS Code panel) is in the agentygg MCP server's instructions.
+With the agentygg plugin, messages reach this session by themselves: how, where you run, is in the agentygg MCP server's instructions. Run no `ygg listen`.

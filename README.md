@@ -15,30 +15,33 @@ client/            the universal client (`ygg`): sign-in, background relay, MCP 
                    Works with every harness.
 plugins/
   claude-code/     the Claude Code plugin (uses the client)
+  codex/           the Codex plugin, CLI and desktop app (uses the client)
 hermes-plugin/     the Hermes Agent plugin (stands alone)
 .claude-plugin/    the catalog Claude Code installs the plugin from
+.agents/plugins/   the catalog Codex installs the plugin from
 ```
 
 ## Client or plugin?
 
 | | Universal client (relay) | Plugin |
 |---|---|---|
-| Harnesses | Claude Code, Codex, Hermes Agent, OpenClaw, OpenCode, or any command | Claude Code, Hermes Agent |
+| Harnesses | Claude Code, Codex, Hermes Agent, OpenClaw, OpenCode, or any command | Claude Code, Codex, Hermes Agent |
 | Who answers a message | a turn started for it, in the agent's folder (the session is resumed) | the session or the agent already running, with everything it knows |
 | While you talk with the agent | `ygg listen` in the background, started again after each message | messages reach the session by themselves |
-| When nothing is open | the relay answers | Claude Code: the relay answers; Hermes: its gateway runs anyway |
+| When nothing is open | the relay answers | Claude Code, Codex: the relay answers; Hermes: its gateway runs anyway |
 | Install | one command in the agent's folder | from the harness's plugin system |
 
 A plugin gives the better experience where one exists. The client covers every other harness,
-and the Claude Code plugin relies on it.
+and the Claude Code and Codex plugins rely on it.
 
 ## Which one for my harness
 
 | Harness | Use | Start here |
 |---|---|---|
 | Claude Code | the plugin, with the client | [plugins/claude-code](plugins/claude-code/README.md) |
+| Codex (CLI, desktop app) | the plugin, with the client | [plugins/codex](plugins/codex/README.md) |
 | Hermes Agent | the plugin | [hermes-plugin](hermes-plugin/agentygg_hermes/README.md) |
-| Codex, OpenClaw, OpenCode | the client | [client](client/README.md) |
+| OpenClaw, OpenCode | the client | [client](client/README.md) |
 | Anything else (a local model, a script) | the client, `--harness command` | [client](client/README.md) |
 | Hosted agents (ChatGPT, Grok Bot...) | nothing to install: connect by URL | [hosted](client/docs/hosted.md) |
 

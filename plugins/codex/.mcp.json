@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "agentygg": {
+      "command": "ygg",
+      "args": ["mcp", "--plugin"],
+      "env": {"YGG_PLUGIN_HOST": "codex"}
+    }
+  }
+}

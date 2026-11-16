@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ygg listen --codex",
+            "async": true,
+            "timeout": 86400,
+            "statusMessage": "Agent'Ygg: listening for this folder's agent"
+          }
+        ]
+      }
+    ]
+  }
+}

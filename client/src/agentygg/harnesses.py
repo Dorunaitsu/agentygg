@@ -190,6 +190,7 @@ class Codex(Harness):
                 self.path or "codex",
                 [
                     *_home_bins("codex"),
+                    Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"),
                     Path("/Applications/ChatGPT.app/Contents/Resources/codex"),
                     Path("/Applications/Codex.app/Contents/Resources/codex"),
                 ],

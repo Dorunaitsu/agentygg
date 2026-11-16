@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 import sys
 
 import httpx2
@@ -26,7 +27,7 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
-from mcp_types import CallToolResult, ListToolsResult, TextContent
+from mcp_types import CallToolResult, ListToolsResult, TextContent, Tool
 
 from agentygg import __version__, store
 from agentygg.api import Gateway, _listen_nonce, _relay_nonce
@@ -147,10 +148,81 @@ def in_vscode_panel() -> bool:
 
 NOT_CONNECTED_TEXT = (
     "Agent'Ygg (the agentygg plugin): its tools act as the agent this project folder belongs to. "
-    "While the folder belongs to no agent there are none; if the user asks to connect this "
-    "project to Agent'Ygg, use the agentygg connect skill. Once it is connected, the tools appear "
-    "by themselves; read the protocol once with `ygg skill` before using them."
+    "While the folder belongs to no agent, the only one is ygg_connect: if the user asks to "
+    "connect this project to Agent'Ygg, call it (no shell command needed, it works from a "
+    "sandboxed session too) and give the user the link and code it returns. Once the folder is "
+    "connected, the tools appear by themselves; read the protocol once with `ygg skill` before "
+    "using them."
 )
+
+# The one tool of a folder of no agent. The server runs outside the harness's sandbox (Codex
+# blocks a session's own commands from the network and from ~/.ygg: 2026-11-16), so connecting
+# from here works where `ygg connect` in the session's shell does not.
+CONNECT_TOOL = Tool(
+    name="ygg_connect",
+    description=(
+        "Connect this project folder to an Agent'Ygg agent. Returns at once a sign-in link and a "
+        "short code: send both to your user (the link as a bare URL on its own line, never in "
+        "backticks or a markdown link). They open it on any device, check the code, and pick or "
+        "create the workspace and the agent; the folder is then connected, with no key to copy. "
+        "Before calling it, tell your user it also starts a background relay that answers this "
+        "agent's messages when no session is open here (relay: false if they do not want it)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "relay": {
+                "type": "boolean",
+                "description": "start the background relay too (default true)",
+            }
+        },
+        "additionalProperties": False,
+    },
+)
+CONNECT_WAIT_S = 20.0
+_LINK = re.compile(r"(https?://\S+)")
+_CODE = re.compile(r"shows the code\s+(\S+)")
+
+
+def start_connect(host: str, relay: bool = True, wait_s: float = CONNECT_WAIT_S) -> str:
+    """Run `ygg connect --plugin` for this folder in the background and return what the user
+    needs: the sign-in link and code (or why it could not start)."""
+    import subprocess
+    import time
+
+    kind = "codex" if host == "codex" else "claude"
+    log = store.logs_dir() / f"connect-{int(time.time())}.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    argv = [sys.executable, "-m", "agentygg.cli", "connect", "--harness", kind, "--plugin"]
+    if not relay:
+        argv.append("--no-relay")
+    with log.open("w") as f:
+        proc = subprocess.Popen(
+            argv,
+            cwd=os.getcwd(),
+            stdin=subprocess.DEVNULL,
+            stdout=f,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,  # it outlives this tool call (it waits for the user)
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+    deadline = time.monotonic() + wait_s
+    text = ""
+    while time.monotonic() < deadline:
+        time.sleep(0.3)
+        text = log.read_text(errors="replace")
+        link, code = _LINK.search(text), _CODE.search(text)
+        if link and code:
+            return (
+                f"Sign-in started for {os.getcwd()}. Send your user this link and code:\n\n"
+                f"{link.group(1)}\n\ncode: {code.group(1)}\n\nThey have 10 minutes. Once they "
+                "approve, this folder belongs to the agent: the agentygg tools appear here within "
+                "seconds, or in a new session if not. Live messages start with the next session."
+            )
+        if proc.poll() is not None:
+            break
+    tail = "\n".join(text.strip().splitlines()[-8:]) or "no output"
+    return f"ygg connect did not give a sign-in link (log: {log}):\n{tail}"
 # How often a server started in a folder of no agent looks for the folder's `.agentygg`.
 BIND_POLL_S = 5.0
 
@@ -229,13 +301,34 @@ PLUGIN_CORE = (
 READY_WAIT_S = 20.0
 
 
+# The Codex plugin: its background hook queues each message into the session (`codex queue`),
+# where it arrives as a turn of its own, led by a line saying it comes from Agent'Ygg.
+PLUGIN_LIVE_CODEX_TEXT = (
+    "## Live pings\n\nWhile this session is open, the agentygg plugin listens for you: each "
+    "Agent'Ygg message arrives in this conversation as a turn of its own, starting with "
+    "\"[Agent'Ygg, not your user]\". Your user did not write it. Run no `ygg listen`. Answer it "
+    "in its topic with these tools when it calls for an answer, then carry on."
+)
+
+
+def plugin_host() -> str:
+    """Which harness runs the plugin: the Codex plugin says so (YGG_PLUGIN_HOST=codex)."""
+    return (os.environ.get("YGG_PLUGIN_HOST") or "claude").strip().lower()
+
+
 def plugin_instructions(bound: bool) -> str:
     """What the plugin's server tells the model, known before any connection: the protocol from
     this client's own skill and the way live pings arrive here, or how to connect the folder."""
     if not bound:
         return NOT_CONNECTED_TEXT
-    live = PLUGIN_LIVE_VSCODE_TEXT if in_vscode_panel() else PLUGIN_LIVE_TEXT
-    return f"{PLUGIN_CORE}\n\n{live}"
+    if plugin_host() == "codex":
+        live = PLUGIN_LIVE_CODEX_TEXT
+    else:
+        live = PLUGIN_LIVE_VSCODE_TEXT if in_vscode_panel() else PLUGIN_LIVE_TEXT
+    core = PLUGIN_CORE
+    if plugin_host() == "codex":
+        core = core.replace("(/agentygg:agentygg)", "($agentygg)")
+    return f"{core}\n\n{live}"
 
 
 async def serve_plugin(identity: store.Identity | None, poll_s: float = BIND_POLL_S) -> None:
@@ -258,10 +351,14 @@ async def serve_plugin(identity: store.Identity | None, poll_s: float = BIND_POL
         await wait_ready()
         if state["remote"] is None:
             state["listed"] = True  # announce the tools once they exist
-            return ListToolsResult(tools=[])
+            return ListToolsResult(tools=[] if identity is not None else [CONNECT_TOOL])
         return await state["remote"].list_tools()
 
     async def call_tool(_ctx, params):
+        if params.name == CONNECT_TOOL.name and state["remote"] is None and identity is None:
+            relay = (params.arguments or {}).get("relay", True) is not False
+            text = await asyncio.to_thread(start_connect, plugin_host(), relay)
+            return CallToolResult(content=[TextContent(type="text", text=text)])
         await wait_ready()
         if state["remote"] is None:
             foreign = store.pointer_for()

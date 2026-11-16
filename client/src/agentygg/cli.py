@@ -26,6 +26,8 @@ import sys
 import time
 from pathlib import Path
 
+import httpx
+
 from agentygg import __version__, store
 from agentygg.api import Gateway, GatewayError, describe_send
 from agentygg.render import render_message
@@ -178,6 +180,14 @@ def _sign_in(api: str, root: Path | None, label: str = "") -> store.Identity:
         t = login.device_login(api, client_name=name)
     except KeyboardInterrupt:
         _fail("cancelled")
+    except (httpx.HTTPError, OSError) as e:
+        # Seen in a Codex session (2026-11-16): its sandbox has no network, and the traceback
+        # hid the reason.
+        _fail(
+            f"cannot reach Agent'Ygg ({api}): {e}. If an agent runs this in a sandbox (Codex, "
+            "for one), it must run it outside the sandbox, with the network and access to ~/.ygg "
+            "(the agent asks its user to approve that)."
+        )
     except login.LoginNeeded as e:
         _fail(f"not connected: {e}")
     me = t["me"]
@@ -247,8 +257,8 @@ def cmd_connect(args) -> None:
                 '`ygg connect --harness command --cmd "<one turn of your agent>"`'
             )
     plugin = bool(getattr(args, "plugin", False))
-    if plugin and kind != "claude":
-        _fail("--plugin is for Claude Code with the agentygg plugin (--harness claude)")
+    if plugin and kind not in ("claude", "codex"):
+        _fail("--plugin is for Claude Code or Codex with the agentygg plugin")
     if kind == "hermes":
         print(
             "Tip: on Hermes Agent, the plugin is the better way (the running agent answers, no "
@@ -459,6 +469,21 @@ def cmd_setup(args) -> None:
             "messages); if not, start a new one (`claude --continue` keeps the conversation)."
         )
         return
+    if kind == "codex" and getattr(args, "plugin", False):
+        # The agentygg plugin brings the MCP server, the protocol and the live pings. An earlier
+        # `ygg setup codex` added a machine-wide agentygg server for this agent: it would list
+        # every tool twice, so it goes (one for another agent stays).
+        removed = _unwire_codex_global(ident.agent_id, args.harness_path)
+        print(
+            f"This directory now belongs to @{ident.agent_id} (the agentygg plugin does the rest):"
+        )
+        for line in done + removed:
+            print(f"  {line}")
+        print(
+            "Start a new Codex session here (or resume this one) for the tools and the live "
+            "messages: the plugin starts listening when a session starts."
+        )
+        return
     # The cross-harness skills location (agentskills.io): OpenClaw, Codex and others read it.
     _write_skill(root / ".agents" / "skills" / "agentygg")
     done.append(".agents/skills/agentygg/       the Agent'Ygg protocol skill")
@@ -648,6 +673,26 @@ def _write_opencode_plugin(root: Path, agent_id: str) -> Path:
     return dest
 
 
+def _unwire_codex_global(agent_id: str, harness_path: str | None = None) -> list[str]:
+    """Remove the machine-wide `agentygg` MCP server `ygg setup codex` added, when it is this
+    agent's: with the plugin, it would list every tool twice."""
+    import subprocess
+
+    from agentygg import harnesses
+
+    try:
+        exe = harnesses.Codex(harness_path).exe()
+    except FileNotFoundError:
+        return []
+    got = subprocess.run(
+        [exe, "mcp", "get", "agentygg", "--json"], check=False, capture_output=True, text=True
+    )
+    if got.returncode != 0 or agent_id not in got.stdout:
+        return []
+    subprocess.run([exe, "mcp", "remove", "agentygg"], check=False, capture_output=True)
+    return ["~/.codex/config.toml          agentygg server removed (the plugin has it)"]
+
+
 def _unwire_claude_project(root: Path) -> list[str]:
     """Take out what `ygg setup claude` wrote for Claude Code in this project (the agentygg
     entry of .mcp.json and the project skill), for the plugin to take over. Other servers stay."""
@@ -755,6 +800,13 @@ def cmd_listen(args) -> None:
     if getattr(args, "hook", False):
         _hook_listen(args)
         return
+    if getattr(args, "codex", False):
+        from agentygg.codex_plugin import hook_main
+
+        stdin = ""
+        with contextlib.suppress(OSError, ValueError):
+            stdin = sys.stdin.read()
+        raise SystemExit(hook_main(stdin))
     if os.environ.get("YGG_RELAY"):
         _fail(
             "ygg listen is for a session a human is having with the agent; this turn was "
@@ -1040,6 +1092,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="the Claude Code plugin's hook outside the terminal: wait for one message, exit 2 "
         "with it (wakes the session)",
+    )
+    a.add_argument(
+        "--codex",
+        action="store_true",
+        help="the Codex plugin's background hook: queue each message into the Codex session "
+        "that started it, for as long as it lives",
     )
     a.set_defaults(fn=cmd_listen)
 

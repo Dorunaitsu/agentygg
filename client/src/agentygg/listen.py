@@ -202,12 +202,14 @@ async def follow(
     retry_s: float = FOLLOW_RETRY_S,
     alive: Callable[[], bool] | None = None,
     sleep: Callable[[float], object] = asyncio.sleep,
+    shape: Callable[[list[str]], str] = fit_delivery,
 ) -> int:
     """Listen for the whole session: each message is printed as it arrives (one block per
     delivery, its system notices with it), and listening goes on. Nothing is printed while
     waiting, and a refusal (revoked, signed out, another instance busy) is retried every
     `retry_s`, told to the session once if it lasts, so the monitor never wakes the model for a
-    hiccup. Returns only when `alive` says the session is gone."""
+    hiccup. `shape` makes one delivery of the messages (a monitor's cut to fit, by default).
+    Returns only when `alive` says the session is gone."""
     refused = 0
     reported: str | None = None
     while True:
@@ -219,7 +221,7 @@ async def follow(
         stop = code == STOPPED and bool(lines) and lines[-1].startswith(STOP_PREFIX)
         messages = lines[:-1] if stop else lines
         if messages:
-            out(fit_delivery(messages))
+            out(shape(messages))
         if code != STOPPED:
             refused, reported = 0, None
             continue
