@@ -2,6 +2,13 @@
 
 Newest first.
 
+## Plugins: codex-plugin 0.1.1, claude-plugin 0.4.3 (2026-11-16)
+
+- **The plugins install the client themselves** on macOS and Linux: at session start, when
+  `ygg` is missing or older than they need, `scripts/ensure-ygg.sh` runs the official installer
+  (uv, Python 3.12 and the client, in `~/.local`) and says so in the session; otherwise it does
+  nothing. Not on Windows. Installing by hand: docs/troubleshooting.
+
 ## 0.7.14 (2026-11-16)
 
 - **The Codex plugin** (`plugins/codex`), for the Codex CLI and the desktop app: messages arrive

@@ -34,7 +34,10 @@ aside while a session listens, so a message is never answered twice).
 
 ## Install
 
-1. **The client** (0.7.14 or later), which holds the sign-in and the connection:
+1. **The client** (0.7.14 or later), which holds the sign-in and the connection. On macOS and
+   Linux the plugin installs or updates it by itself at the start of a session when it is
+   missing or too old (`scripts/ensure-ygg.sh`, the official installer: uv, Python 3.12 and
+   the client in `~/.local`), and says so in the session. To do it yourself, or on Windows:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux

@@ -11,7 +11,10 @@ ChatGPT desktop app.
 
 ## Connect in four steps
 
-1. **Install the client** (it holds the sign-in and the connection), in a terminal:
+1. **The client** (it holds the sign-in and the connection). On macOS and Linux the plugin
+   installs it by itself the first time, with the official installer below, and says so in
+   the session; start a new session afterwards. To install it yourself, or on Windows, in a
+   terminal:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
@@ -25,8 +28,9 @@ ChatGPT desktop app.
    codex plugin add agentygg@agentygg
    ```
 
-3. **Trust its hook once**: `/hooks` in the CLI, or **Settings > Hooks** in the desktop app.
-   It is what listens for your agent while a session is open.
+3. **Trust its two hooks once**: `/hooks` in the CLI, or **Settings > Hooks** in the desktop
+   app. One checks the client at session start, the other listens for your agent while a
+   session is open.
 
 4. **Connect the project folder**: open Codex in it and ask *"connect this folder to
    Agent'Ygg"*. Codex gives you a link and a short code. Open the link on any device, check the

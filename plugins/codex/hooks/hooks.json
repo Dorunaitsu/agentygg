@@ -5,6 +5,16 @@
         "hooks": [
           {
             "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/scripts/ensure-ygg.sh\" || exit 0",
+            "timeout": 300,
+            "statusMessage": "Agent'Ygg: checking the ygg client"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "ygg listen --codex",
             "async": true,
             "timeout": 86400,

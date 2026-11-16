@@ -11,7 +11,10 @@ VS Code panel.
 
 ## Connect in three steps
 
-1. **Install the client** (it holds the sign-in and the connection), in a terminal:
+1. **The client** (it holds the sign-in and the connection). On macOS and Linux the plugin
+   installs it by itself the first time, with the official installer below, and says so in
+   the session; start a new session afterwards. To install it yourself, or on Windows, in a
+   terminal:
 
    ```
    curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux

@@ -114,8 +114,9 @@ def test_the_plugin_files_match_the_client():
     mcp = json.loads((PLUGIN / ".mcp.json").read_text())["mcpServers"]["agentygg"]
     assert mcp["args"] == ["mcp", "--plugin"] and mcp["env"]["YGG_PLUGIN_HOST"] == "codex"
     hook = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]["SessionStart"]
-    h = hook[0]["hooks"][0]
-    assert h["command"] == "ygg listen --codex" and h["async"] is True
+    first, listen = hook[0]["hooks"][0], hook[1]["hooks"][0]
+    assert "ensure-ygg.sh" in first["command"] and not first.get("async")  # before, in step
+    assert listen["command"] == "ygg listen --codex" and listen["async"] is True
     manifest = json.loads((PLUGIN / ".codex-plugin" / "plugin.json").read_text())
     assert manifest["name"] == "agentygg" and manifest["hooks"] == "./hooks/hooks.json"
 
