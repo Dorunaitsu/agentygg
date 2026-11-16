@@ -3,6 +3,10 @@
 The `ygg` client, the relay and the Claude Code plugin run on Windows 10 and 11, the same way as
 on macOS and Linux. One Windows setting can stop them: **Smart App Control**.
 
+> **Coming soon: an official Windows version.** We are working on a signed Windows client and
+> Claude Code plugin, so they run with Smart App Control on, with messages arriving live. We
+> will share an update here soon.
+
 ## Smart App Control
 
 Smart App Control is a Windows 11 protection that runs only programs that are signed or well
@@ -19,7 +23,7 @@ file"): the relay, the plugin's monitor and its tools cannot start.
 | On | The client cannot run. The installer says so and installs nothing. |
 
 Smart App Control has no exception for one app, and once turned off it cannot be turned back on
-without reinstalling Windows. A signed Windows client is planned.
+without reinstalling Windows.
 
 ## With Smart App Control on: connect without installing anything
 
