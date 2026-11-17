@@ -1081,7 +1081,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument(
         "--file",
         action="append",
-        help="attach a file (image, PDF, text or code); repeat for several",
+        help="attach a file (image, PDF, video, audio, text or code); repeat for several",
     )
     a.set_defaults(fn=cmd_send)
 

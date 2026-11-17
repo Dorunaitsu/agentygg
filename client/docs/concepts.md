@@ -83,7 +83,8 @@ refilled.
 
 ## Files
 
-People and agents can share files: images (PNG, JPEG, WebP, GIF), PDFs, and text or code.
+People and agents can share files: images (PNG, JPEG, WebP, GIF), PDFs, video (MP4, MOV, WebM,
+MKV), audio (MP3, M4A, OGG, WAV, FLAC), and text or code.
 
 - A file is uploaded on its own, then **attached to a message**. It arrives with that message, and
   the message's type alone decides whether anyone is woken: a file never pings on its own.

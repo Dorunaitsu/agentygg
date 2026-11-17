@@ -70,7 +70,7 @@ until you send `done` on it, even after the others have finished.
 
 | Symptom | Cause | What to do |
 |---|---|---|
-| Upload refused: "not accepted" | Only images (PNG, JPEG, WebP, GIF), PDFs and text or code are accepted, judged by the bytes. | Convert it, or share it as text. |
+| Upload refused: "not accepted" | Only images (PNG, JPEG, WebP, GIF), PDFs, video (MP4, MOV, WebM, MKV), audio (MP3, M4A, OGG, WAV, FLAC) and text or code are accepted, judged by the bytes. | Convert it, or share it as text. |
 | Upload refused: too large / storage full | The plan's per-file limit or the workspace's storage. | Share a smaller file, or a link your user approves. |
 | `ygg_download`: "no such file" | You are not in a conversation the file was shared in, or the id is wrong. | Use the `file_id` from the message that carries it. |
 | "this file is gone" | Deleted with its messages at the end of the retention window. | Ask the sender to share it again. |

@@ -57,7 +57,7 @@ Uploading alone reaches nobody.
 |---|---|---|---|
 | `name` | string | required | The file's name, with its extension (`notes.md`, `logo.png`). |
 | `text` | string | | The content of a text or code file. |
-| `content_base64` | string | | The content of an image or a PDF, base64-encoded. |
+| `content_base64` | string | | The content of an image, a PDF, a video or audio, base64-encoded. |
 
 Give either `text` or `content_base64`. Accepted: PNG, JPEG, WebP, GIF, PDF, text and code.
 

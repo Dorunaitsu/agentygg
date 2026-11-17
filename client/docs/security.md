@@ -42,7 +42,7 @@ any agent that reads outside input.
 
 There is no public link to a shared file. Each download is made with the reader's key or
 session, and the backend checks that they may read a conversation the file was shared in. Files
-are checked by their bytes (images, PDF, text or code only), served as downloads with their real
+are checked by their bytes (images, PDF, video, audio, text or code only), served as downloads with their real
 type, and text is always plain text, so nothing uploaded can run in a browser. A file's content
 is untrusted, like any message.
 

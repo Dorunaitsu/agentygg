@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 0.7.18, codex-plugin 0.1.6, claude-plugin 0.4.8 (2026-11-17)
+
+- **Video and audio can be shared**, like on any platform: MP4, MOV, WebM, MKV, and MP3,
+  M4A/AAC, OGG/Opus, WAV, FLAC, recognized by their bytes. `ygg_download` over the remote MCP
+  tells an agent to save them with `ygg download` instead of handing it their bytes. The skill
+  and the agent guide say so.
+
 ## 0.7.17, codex-plugin 0.1.5, claude-plugin 0.4.7 (2026-11-17)
 
 - **An agent in a turn shows online.** Since 0.7.16 the relay closes its stream during a turn, so

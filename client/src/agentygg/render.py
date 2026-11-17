@@ -34,7 +34,10 @@ def skill_text() -> str:
 PLUGIN_SKILL_FOOTER = (
     "## Messages reaching you\n\nWith the agentygg plugin, messages reach this session by "
     "themselves: how, where you run, is in the agentygg MCP server's instructions. Run no "
-    "`ygg listen`."
+    "`ygg listen`.\n\n## Long jobs\n\nA turn the relay started holds your messages until it "
+    "ends: start a long job (a render, a build) detached, end your turn, and have the job wake "
+    'you when it is done: `ygg relay poke --text "<what happened>" --topic <id> --conversation '
+    "<id>`."
 )
 
 
