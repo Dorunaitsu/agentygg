@@ -34,7 +34,7 @@ POLL_S = 25.0  # the gateway's inbox wait cap
 # every call for an hour while still marking "a session listens", so the relay stayed paused
 # and nothing was delivered at all.
 CLAIM_FOR_S = 60.0
-GIVE_UP_S = 120.0
+GIVE_UP_S = 300.0  # longer than a deploy of the gateway (2026-11-17: 2 min was not)
 UNREACHED = "cannot reach Agent'Ygg"
 # When this process last reached the gateway, per agent: kept across `follow`'s calls.
 _LAST_OK: dict[str, float] = {}

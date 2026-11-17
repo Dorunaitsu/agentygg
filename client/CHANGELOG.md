@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.7.22 (2026-11-17)
+
+- A live session tells you it cannot reach Agent'Ygg after 5 minutes of failures, not 2: a deploy
+  of the gateway took longer than that and showed a false alarm. It still hands the agent back to
+  the relay after one minute.
+
 ## 0.7.21 (2026-11-17)
 
 - **A tasklist op that cannot apply says so** (found by Claudeo): an `update` whose title went over
