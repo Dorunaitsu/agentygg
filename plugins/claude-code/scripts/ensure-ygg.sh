@@ -8,7 +8,7 @@
 # - Windows: the same notice, with the PowerShell installer.
 #
 # It always exits 0: the session goes on.
-MIN="0.7.16"
+MIN="0.7.20"
 [ -n "${YGG_RELAY:-}" ] && exit 0  # a turn the relay started: the client is there
 
 case "$(uname -s 2>/dev/null)" in

@@ -28,6 +28,16 @@ from agentygg.api import Gateway, GatewayError, _relay_nonce
 from agentygg.render import render_message
 
 POLL_S = 25.0  # the gateway's inbox wait cap
+# A listener that has not reached the gateway for this long stops claiming the agent (the relay
+# takes over within its 90 s), and after GIVE_UP_S it stops and says so. Claudeo, 2026-11-17: a
+# listener whose client was replaced under it (`uv tool install --force` mid-session) failed
+# every call for an hour while still marking "a session listens", so the relay stayed paused
+# and nothing was delivered at all.
+CLAIM_FOR_S = 60.0
+GIVE_UP_S = 120.0
+UNREACHED = "cannot reach Agent'Ygg"
+# When this process last reached the gateway, per agent: kept across `follow`'s calls.
+_LAST_OK: dict[str, float] = {}
 
 # Exit codes.
 GOT_MESSAGE = 0
@@ -68,13 +78,22 @@ async def listen(
     deadline = time.monotonic() + timeout if timeout > 0 else None
     backoff = 2.0
     busy_since: float | None = None
+    _LAST_OK.setdefault(agent_id, time.monotonic())
     while True:
         if alive is not None and not alive():
             # Whoever started us is gone (an OpenCode closed without stopping its plugin): stop
             # taking messages nobody would read, and hand the pings back to the relay at once.
             store.clear_listen(agent_id)
             return STOPPED
-        store.touch_listen(agent_id, gw.nonce)
+        failing_for = time.monotonic() - _LAST_OK[agent_id]
+        if failing_for < CLAIM_FOR_S:
+            store.touch_listen(agent_id, gw.nonce)
+        elif failing_for >= GIVE_UP_S:
+            store.clear_listen(agent_id)  # the relay answers again at once
+            for f in held:
+                out(render_message(f))
+            out(f"ygg listen stopped: {UNREACHED} (the relay answers meanwhile)")
+            return STOPPED
         wait = POLL_S
         if deadline is not None:
             left = deadline - time.monotonic()
@@ -85,6 +104,7 @@ async def listen(
             got = await gw.inbox(wait=wait)
             backoff = 2.0
             busy_since = None
+            _LAST_OK[agent_id] = time.monotonic()
         except GatewayError as e:
             if e.status == 409:
                 # Another instance holds the lease. Often our own session a moment ago (a send
@@ -237,7 +257,9 @@ async def follow(
             return STOPPED
         refused += 1
         detail = lines[-1][len(STOP_PREFIX) :] if stop else "refused"
-        if refused >= FOLLOW_REPORT_AFTER and detail != reported:
+        # Unreachable for minutes already: say it now, not after more rounds.
+        lasting = refused >= FOLLOW_REPORT_AFTER or detail.startswith(UNREACHED)
+        if lasting and detail != reported:
             out(
                 f"Agent'Ygg: messages are not reaching this session for now ({detail}). "
                 "The plugin keeps trying every minute; nothing to do unless it lasts."

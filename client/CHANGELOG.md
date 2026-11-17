@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 0.7.20, codex-plugin 0.1.7, claude-plugin 0.4.9 (2026-11-17)
+
+- **A live session that can no longer reach Agent'Ygg hands the agent back to the relay**
+  (found with Claudeo): a listener whose client was replaced under it (an update mid-session)
+  failed every call for an hour while still marking "a session listens", so the relay stayed
+  paused and nothing was delivered. A listener now claims the agent only while it reaches the
+  gateway: after a minute of failures it stops claiming it (the relay takes over), after two it
+  stops and tells the session. The plugins ask for 0.7.20.
+- After updating the client, start a new session: a session keeps the client it started with.
+
 ## 0.7.19 (2026-11-17)
 
 - `ygg relay poke` on Windows: two notes left within one tick of its coarse clock got the same

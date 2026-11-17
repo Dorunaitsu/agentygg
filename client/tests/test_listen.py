@@ -469,3 +469,55 @@ def test_the_relay_shows_present_during_a_turn_and_stops_on_an_old_server(home):
     asyncio.run(asyncio.wait_for(relay._keep_present(), 1))
     assert len(calls) == 3  # kept going, then stopped on the server without /presence
     asyncio.run(relay.gw.close())
+
+
+def test_a_listener_that_cannot_reach_the_gateway_stops_claiming_the_agent(home, monkeypatch):
+    """Claudeo, 2026-11-17: a listener whose client was replaced under it failed every call for
+    an hour while still marking "a session listens": the relay stayed paused, nothing was
+    delivered. Now it stops claiming the agent after CLAIM_FOR_S, and gives up after GIVE_UP_S
+    (clearing the mark so the relay answers at once)."""
+    import httpx as _httpx
+
+    clock = [1000.0]
+    monkeypatch.setattr(lst.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(lst, "CLAIM_FOR_S", 60.0)
+    monkeypatch.setattr(lst, "GIVE_UP_S", 120.0)
+    lst._LAST_OK.pop("bot", None)
+
+    class Down:
+        identity = store.Identity("bot", "lab", "yga_x")
+        nonce = "n1"
+
+        async def inbox(self, wait=0.0):
+            clock[0] += 30.0  # each failed try takes time
+            raise _httpx.ConnectError("certificate file gone")
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(lst.asyncio, "sleep", no_sleep)
+    claims = []
+    orig = store.touch_listen
+    monkeypatch.setattr(store, "touch_listen", lambda a, n: (claims.append(clock[0]), orig(a, n)))
+    lines = []
+    code = asyncio.run(lst.listen(Down(), out=lines.append, retry_cap=0))
+    assert code == lst.STOPPED
+    assert lines[-1].startswith("ygg listen stopped: cannot reach Agent'Ygg")
+    assert all(t - 1000.0 < 60.0 for t in claims)  # no claim once it had failed for a minute
+    assert not store.listener_active("bot")  # cleared: the relay takes over now
+
+
+def test_a_listener_that_reaches_the_gateway_keeps_claiming(home, monkeypatch):
+    lst._LAST_OK.pop("bot", None)
+    ping = {"kind": "wake", "from": {"kind": "human"}, "envelope": {"from": "human.ray"}}
+
+    class Up:
+        identity = store.Identity("bot", "lab", "yga_x")
+        nonce = "n1"
+
+        async def inbox(self, wait=0.0):
+            return {"wakes": [ping], "mailbox": []}
+
+    out = []
+    assert asyncio.run(lst.listen(Up(), out=out.append)) == lst.GOT_MESSAGE
+    assert store.listener_active("bot")
