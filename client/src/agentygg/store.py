@@ -13,6 +13,7 @@ import base64
 import contextlib
 import json
 import os
+import secrets
 import threading
 import time
 from dataclasses import dataclass
@@ -214,6 +215,7 @@ LISTEN_TTL_S = 90.0
 # -- local pokes: a job on this machine wakes its agent (`ygg relay poke`) ------------------ #
 
 POKES_MAX = 20
+_POKE_SEQ = 0
 
 
 def pokes_dir(agent_id: str) -> Path:
@@ -228,7 +230,11 @@ def write_poke(agent_id: str, text: str, topic: str = "", conversation: str = ""
     if len(list(d.glob("*.json"))) >= POKES_MAX:
         raise RuntimeError(f"{POKES_MAX} notes already wait for @{agent_id}; not adding more")
     body = {"text": text[:4000], "topic": topic, "conversation": conversation, "ts": time.time()}
-    path = d / f"{time.time_ns()}-{os.getpid()}.json"
+    # Unique even within one clock tick (Windows' clock is coarse: two notes written in a row got
+    # the same name and the second replaced the first, CI 2026-11-17), and in order.
+    global _POKE_SEQ
+    _POKE_SEQ += 1
+    path = d / f"{time.time_ns():020d}-{_POKE_SEQ:06d}-{os.getpid()}-{secrets.token_hex(3)}.json"
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(body))
     tmp.replace(path)

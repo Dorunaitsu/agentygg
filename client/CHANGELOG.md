@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 0.7.19 (2026-11-17)
+
+- `ygg relay poke` on Windows: two notes left within one tick of its coarse clock got the same
+  file name, and the second replaced the first. Each note now has a unique name, in order.
+
 ## 0.7.18, codex-plugin 0.1.6, claude-plugin 0.4.8 (2026-11-17)
 
 - **Video and audio can be shared**, like on any platform: MP4, MOV, WebM, MKV, and MP3,
