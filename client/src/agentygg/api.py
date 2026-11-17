@@ -264,10 +264,13 @@ def describe_send(r: dict) -> str:
             note += f": {CONTEXT_NOTES[reason]}"
     else:
         note = f"NOT delivered ({reason})"
-    return (
+    line = (
         f"{note}. message_id={r.get('message_id')} "
         f"conversation_id={r.get('conversation_id')} topic_id={r.get('topic_id')}"
     )
+    for t in r.get("tasks_ignored") or []:
+        line += f"\nTasklist: {t.get('op')} {t.get('id') or ''} NOT applied: {t.get('detail')}"
+    return line
 
 
 def _close_reason(status: int) -> str:

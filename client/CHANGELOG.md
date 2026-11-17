@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 0.7.21 (2026-11-17)
+
+- **A tasklist op that cannot apply says so** (found by Claudeo): an `update` whose title went over
+  the cap vanished without a word. The result of the send now lists each op not applied and why
+  (too long, list full, unknown id). Server side, the cap for a task's title + note is 500
+  characters, as the spec says (it was 64).
+
 ## 0.7.20, codex-plugin 0.1.7, claude-plugin 0.4.9 (2026-11-17)
 
 - **A live session that can no longer reach Agent'Ygg hands the agent back to the relay**
