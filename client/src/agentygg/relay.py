@@ -78,6 +78,12 @@ class Relay:
         self.me: dict = {}
         self.context: list[dict] = []
         self.queue: asyncio.Queue[dict] = asyncio.Queue()
+        # Set while no turn runs and nothing waits for one: only then does the relay hold the
+        # stream. During a turn the stream is closed, so the next messages stay on the server:
+        # a live session that opens meanwhile gets them, and a restart loses none (Claudeo,
+        # 2026-11-17: a 29-minute turn held every message sent meanwhile in this process).
+        self.idle = asyncio.Event()
+        self.idle.set()
         self.turns = 0
 
     # -- session memory (one harness session per agent + directory) --------- #
@@ -193,15 +199,20 @@ class Relay:
                     self._backoff = 2.0
                     self._refused = 0
                     log(f"connected as @{self.identity.agent_id}, waiting for messages")
-                elif kind in ("wake", "context"):
+                elif kind == "wake":
+                    self.idle.clear()
+                    await self.queue.put(frame)
+                    return  # one wake at a time: the rest waits on the server
+                elif kind == "context":
                     await self.queue.put(frame)
 
     def _listened(self) -> bool:
         return store.listener_active(self.identity.agent_id)
 
-    async def _stream_once(self) -> bool:
+    async def _stream_once(self) -> bool | None:
         """One connection of the stream. Returns True if it ended because a live session
-        started listening (the relay then steps aside), False if the server closed it."""
+        started listening (the relay then steps aside), None if it took a wake (the stream is
+        closed until that turn is over), False if the server closed it."""
         consume = asyncio.create_task(self._consume())
         try:
             while not consume.done():
@@ -209,7 +220,7 @@ class Relay:
                 if not consume.done() and self._listened():
                     return True
             consume.result()  # raises what ended it (GatewayError, connection lost...)
-            return False
+            return None if not self.idle.is_set() else False
         finally:
             if not consume.done():
                 consume.cancel()  # the server puts back anything it was handing over
@@ -229,8 +240,15 @@ class Relay:
                     await asyncio.sleep(self.listen_check_s)
                 log("resumed: the live session stopped listening")
                 continue
+            if not self.idle.is_set():
+                await self.idle.wait()  # a turn is running: its end opens the stream again
+                continue
             try:
-                if await self._stream_once():
+                ended = await self._stream_once()
+                if ended is True:
+                    continue
+                if ended is None:
+                    await self.idle.wait()  # the turn, then back to the stream
                     continue
                 log("stream closed by the server, reconnecting")
             except GatewayError as e:
@@ -267,6 +285,8 @@ class Relay:
                     await self.handle(frame)
                 except Exception as e:  # noqa: BLE001 - one failed turn never stops the relay
                     log(f"  turn crashed: {e!r}")
+            if self.queue.empty():
+                self.idle.set()
             # A restart asked during a turn (`ygg relay restart` run by the agent itself) waits
             # for that turn, and for what is already queued: restarting at once would end the
             # turn that asked for it before it could answer (Codex, 2026-11-03).

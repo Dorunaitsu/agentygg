@@ -2,6 +2,7 @@
 pings (system notices never end the wait), and a relay for the same agent steps aside while
 that session listens, so the two never race for a wake."""
 
+import contextlib
 import asyncio
 import os
 import types
@@ -334,4 +335,44 @@ def test_a_refused_reconnection_is_retried_and_only_a_lasting_one_stops_the_rela
     with pytest.raises(GatewayError):
         asyncio.run(relay._reader())
     assert len(tries) == rl.REFUSALS_BEFORE_STOP
+    asyncio.run(relay.gw.close())
+
+
+def test_the_relay_takes_one_wake_and_leaves_the_rest_on_the_server(home):
+    """Claudeo, 2026-11-17: during a 29-minute turn the relay kept reading its stream, taking
+    every message sent meanwhile into its own memory; the live session opened then never saw
+    them. Now it closes the stream on a wake and opens it again only once the turn is over."""
+    relay = Relay(
+        store.Identity("bot", "lab", "yga_x"), home, command=["true"], listen_check_s=0.01
+    )
+    relay._listened = lambda: False
+    opened, closed = [], []
+
+    async def stream():
+        opened.append(1)
+        try:
+            yield {"kind": "hello"}
+            yield {"kind": "wake", "envelope": {"message_id": "m1"}}
+            yield {"kind": "wake", "envelope": {"message_id": "m2"}}  # must stay on the server
+            await asyncio.sleep(3600)
+        finally:
+            closed.append(1)
+
+    relay.gw.stream = stream
+
+    async def go():
+        assert await relay._stream_once() is None  # took a wake, closed the stream
+        assert closed == [1] and relay.queue.qsize() == 1 and not relay.idle.is_set()
+        reader = asyncio.create_task(relay._reader())
+        await asyncio.sleep(0.05)
+        assert len(opened) == 1  # no new connection while the turn is pending
+        relay.queue.get_nowait()
+        relay.idle.set()  # the turn is over
+        await asyncio.sleep(0.05)
+        assert len(opened) == 2  # back on the stream
+        reader.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await reader
+
+    asyncio.run(go())
     asyncio.run(relay.gw.close())

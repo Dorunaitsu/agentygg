@@ -34,7 +34,7 @@ aside while a session listens, so a message is never answered twice).
 
 ## Install
 
-1. **The client** (0.7.15 or later), which holds the sign-in and the connection. When it is missing
+1. **The client** (0.7.16 or later), which holds the sign-in and the connection. When it is missing
    or too old, the plugin says so at the start of a session (`scripts/ensure-ygg.sh`, which
    installs nothing), and Claude asks your permission before running the official installer
    (uv, Python 3.12 and the client in `~/.local`). Or do it yourself:

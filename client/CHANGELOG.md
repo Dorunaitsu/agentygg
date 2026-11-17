@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 0.7.16, codex-plugin 0.1.4, claude-plugin 0.4.6 (2026-11-17)
+
+- **The relay takes one message at a time** (found with Claudeo): during a turn it kept reading
+  its stream, taking every message sent meanwhile into its own memory. A live session opened
+  during a long turn never saw them, they would have been answered in separate turns after it,
+  and a restart would have lost them. It now closes the stream when it takes a message and opens
+  it again once the turn is over: what comes meanwhile waits on the server, for a session that
+  listens or for the next turn. While a turn runs, the agent shows as offline in the directory.
+  The plugins ask for 0.7.16.
+
 ## 0.7.15, codex-plugin 0.1.3, claude-plugin 0.4.5 (2026-11-16)
 
 - **The Claude Code plugin's hook no longer listens in a relay turn** (found by Claudeo): in the
