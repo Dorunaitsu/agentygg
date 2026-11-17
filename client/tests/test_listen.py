@@ -376,3 +376,96 @@ def test_the_relay_takes_one_wake_and_leaves_the_rest_on_the_server(home):
 
     asyncio.run(go())
     asyncio.run(relay.gw.close())
+
+
+def test_local_notes_are_kept_in_order_taken_once_and_capped(home):
+    store.write_poke("bot", "first", topic="t1")
+    store.write_poke("bot", "second")
+    assert store.has_pokes("bot")
+    got = store.take_pokes("bot")
+    assert [g["text"] for g in got] == ["first", "second"] and got[0]["topic"] == "t1"
+    assert store.take_pokes("bot") == [] and not store.has_pokes("bot")
+    for i in range(store.POKES_MAX):
+        store.write_poke("bot", f"n{i}")
+    with pytest.raises(RuntimeError):
+        store.write_poke("bot", "one too many")
+
+
+def test_an_idle_relay_turns_a_local_note_into_a_turn(home):
+    """Claudeo, 2026-11-17: a long render runs in the background; when it ends, its script runs
+    `ygg relay poke` and the agent is woken here, without a message."""
+    relay = Relay(store.Identity("bot", "lab", "yga_x"), home, command=["true"])
+    relay.poke_check_s = 0.01
+    relay._listened = lambda: False
+    store.write_poke("bot", "render 42 done: out/loop.webp", topic="t9")
+
+    async def go():
+        task = asyncio.create_task(relay._poker())
+        frame = await asyncio.wait_for(relay.queue.get(), 1)
+        task.cancel()
+        return frame
+
+    frame = asyncio.run(go())
+    assert frame["kind"] == "poke" and frame["pokes"][0]["text"].startswith("render 42")
+    assert not relay.idle.is_set()  # a turn is due: the stream closes meanwhile
+    from agentygg.render import poke_prompt
+
+    prompt = poke_prompt({"agent_id": "bot"}, frame["pokes"])
+    assert "not a message from anyone" in prompt and 'topic_id="t9"' in prompt
+    asyncio.run(relay.gw.close())
+
+
+def test_a_busy_or_listened_relay_leaves_the_notes_alone(home):
+    relay = Relay(store.Identity("bot", "lab", "yga_x"), home, command=["true"])
+    relay.poke_check_s = 0.01
+    store.write_poke("bot", "done")
+
+    async def go(listened: bool, idle: bool):
+        relay._listened = lambda: listened
+        relay.idle.set() if idle else relay.idle.clear()
+        task = asyncio.create_task(relay._poker())
+        await asyncio.sleep(0.05)
+        task.cancel()
+
+    asyncio.run(go(listened=True, idle=True))  # the live session delivers them
+    asyncio.run(go(listened=False, idle=False))  # a turn runs: after it
+    assert relay.queue.empty() and store.has_pokes("bot")
+    asyncio.run(relay.gw.close())
+
+
+def test_a_live_session_gets_the_local_notes(home):
+    gw = types.SimpleNamespace(identity=store.Identity("bot", "lab", "yga_x"), nonce="n1")
+    store.write_poke("bot", "render done")
+    seen = []
+
+    async def fake_listen(gw_, out, alive=None):
+        return lst.STOPPED
+
+    async def go():
+        orig = lst.listen
+        lst.listen = fake_listen
+        try:
+            calls = iter([True, False])
+            await lst.follow(gw, out=seen.append, alive=lambda: next(calls, False), sleep=lambda s: asyncio.sleep(0))
+        finally:
+            lst.listen = orig
+
+    asyncio.run(go())
+    assert any("render done" in s and "[local]" in s for s in seen)
+
+
+def test_the_relay_shows_present_during_a_turn_and_stops_on_an_old_server(home):
+    relay = Relay(store.Identity("bot", "lab", "yga_x"), home, command=["true"])
+    relay.presence_every_s = 0.01
+    calls = []
+
+    async def present():
+        calls.append(1)
+        if len(calls) >= 3:
+            raise GatewayError(404, "not found")
+        return {"ok": True}
+
+    relay.gw.presence = present
+    asyncio.run(asyncio.wait_for(relay._keep_present(), 1))
+    assert len(calls) == 3  # kept going, then stopped on the server without /presence
+    asyncio.run(relay.gw.close())

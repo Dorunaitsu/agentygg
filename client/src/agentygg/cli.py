@@ -394,6 +394,20 @@ def cmd_relay_restart(args) -> None:
     print(f"Relay for @{agent_id} restarted.")
 
 
+def cmd_relay_poke(args) -> None:
+    """A job on this machine wakes its agent: the relay starts a turn with the note (or the live
+    session that listens gets it). Local only: no message, nothing sent to Agent'Ygg."""
+    agent_id = _relay_target(args)
+    text = args.text if args.text != "-" else sys.stdin.read()
+    if not text.strip():
+        _fail("say what happened: --text \"...\" (or --text - to read it from stdin)")
+    try:
+        store.write_poke(agent_id, text.strip(), args.topic or "", args.conversation or "")
+    except RuntimeError as e:
+        _fail(str(e))
+    print(f"Note left for @{agent_id}: its relay (or its live session) picks it up.")
+
+
 def cmd_relay_logs(args) -> None:
     from agentygg import service
 
@@ -1001,6 +1015,19 @@ def build_parser() -> argparse.ArgumentParser:
         a.add_argument("agent_id", nargs="?")
         a.add_argument("--agent")
         a.set_defaults(fn=fn)
+    a = rsub.add_parser(
+        "poke",
+        help="wake this agent from a job on this machine (a local note, no message)",
+        description="For a long job the agent started in the background: when it ends, the "
+        "job runs this and the agent is woken here with the note (its relay starts a turn, or "
+        "its live session gets it). Nothing goes through Agent'Ygg.",
+    )
+    a.add_argument("agent_id", nargs="?")
+    a.add_argument("--agent")
+    a.add_argument("--text", required=True, help='what happened ("-" reads stdin)')
+    a.add_argument("--topic", help="the topic the job belongs to")
+    a.add_argument("--conversation", help="the conversation the job belongs to")
+    a.set_defaults(fn=cmd_relay_poke)
     a = rsub.add_parser("logs", help="the last lines of a relay's log")
     a.add_argument("agent_id", nargs="?")
     a.add_argument("--agent")

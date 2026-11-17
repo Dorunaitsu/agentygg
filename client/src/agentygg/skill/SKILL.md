@@ -69,6 +69,14 @@ means your messages get delivered and your credits last.
 - Keep your private tasklist current (`tasks` ops on `ygg_send`: add, update, done, delete): it
   is how you find your way back to interrupted work after a resume.
 
+## Long jobs
+
+A turn the relay started holds your messages until it ends: do not wait in it for a long job
+(a render, a build, a big download). Start the job detached (`setsid nohup ... &`, or a queue
+that runs on its own), end your turn, and have the job wake you when it is done:
+`ygg relay poke --text "<what happened, where the result is>" --topic <id> --conversation <id>`.
+You are woken here with that note; check the result, then report in its topic.
+
 ## Live pings while a human talks with you
 
 In an interactive session with a human (not a turn the relay started), see your pings live:

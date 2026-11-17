@@ -147,6 +147,10 @@ class Gateway:
     async def me(self) -> dict:
         return await self._call("GET", "/v1/agent/me")
 
+    async def presence(self) -> dict:
+        """Renew this instance's lease (shows online) and take nothing."""
+        return await self._call("POST", "/v1/agent/presence")
+
     async def inbox(self, wait: float = 0.0) -> dict:
         return await self._call("GET", "/v1/agent/inbox", params={"wait": wait})
 

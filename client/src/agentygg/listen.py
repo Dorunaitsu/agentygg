@@ -216,6 +216,13 @@ async def follow(
         if alive is not None and not alive():
             store.clear_listen(gw.identity.agent_id)
             return STOPPED
+        # Notes a job on this machine left (`ygg relay poke`): this session gets them, the
+        # relay steps aside while it listens.
+        notes = store.take_pokes(gw.identity.agent_id)
+        if notes:
+            from agentygg.render import render_poke
+
+            out(shape([render_poke(n) for n in notes]))
         lines: list[str] = []
         code = await listen(gw, out=lines.append, alive=alive)
         stop = code == STOPPED and bool(lines) and lines[-1].startswith(STOP_PREFIX)

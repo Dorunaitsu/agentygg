@@ -26,7 +26,7 @@ import httpx
 from agentygg import harnesses, store
 from agentygg.api import Gateway, GatewayError
 from agentygg.harnesses import TurnResult
-from agentygg.render import wake_prompt
+from agentygg.render import poke_prompt, wake_prompt
 
 __all__ = ["Relay", "TurnResult", "log"]
 
@@ -53,6 +53,10 @@ RESTART_EXIT = 75
 # How many refusals (401/403) in a row stop the relay: with the backoff (2 s doubling to 60 s)
 # that is several minutes of a refused sign-in, not a hiccup.
 REFUSALS_BEFORE_STOP = 6
+# During a turn: how often the relay tells the gateway it is still here (the lease lives 60 s).
+PRESENCE_EVERY_S = 20.0
+# How often an idle relay looks for local notes (`ygg relay poke`).
+POKE_CHECK_S = 2.0
 
 
 @dataclass
@@ -84,6 +88,8 @@ class Relay:
         # 2026-11-17: a 29-minute turn held every message sent meanwhile in this process).
         self.idle = asyncio.Event()
         self.idle.set()
+        self.presence_every_s = PRESENCE_EVERY_S
+        self.poke_check_s = POKE_CHECK_S
         self.turns = 0
 
     # -- session memory (one harness session per agent + directory) --------- #
@@ -174,6 +180,52 @@ class Relay:
         result.seconds = time.monotonic() - started
         return result
 
+    async def _keep_present(self) -> None:
+        """During a turn the stream is closed (messages wait on the server): tell the gateway
+        we are still here, so the agent shows online, not offline. An older server without
+        /presence answers 404: then stop trying."""
+        while True:
+            try:
+                await self.gw.presence()
+            except GatewayError as e:
+                if e.status == 404:
+                    return
+            except (httpx.HTTPError, OSError):
+                pass
+            await asyncio.sleep(self.presence_every_s)
+
+    async def _turn(self, prompt: str) -> TurnResult:
+        present = asyncio.create_task(self._keep_present())
+        try:
+            return await self.run_turn(prompt)
+        finally:
+            present.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await present
+
+    async def _poker(self) -> None:
+        """Local notes (`ygg relay poke`): when no turn runs and no live session listens (that
+        one delivers them itself), take them and start a turn."""
+        while True:
+            await asyncio.sleep(self.poke_check_s)
+            if not self.idle.is_set() or self._listened():
+                continue
+            if not store.has_pokes(self.identity.agent_id):
+                continue
+            pokes = store.take_pokes(self.identity.agent_id)
+            if pokes:
+                self.idle.clear()
+                await self.queue.put({"kind": "poke", "pokes": pokes})
+
+    async def handle_poke(self, pokes: list[dict]) -> None:
+        log(f'local note ({len(pokes)}): "{pokes[0].get("text", "")[:80]}"')
+        result = await self._turn(poke_prompt(self.me, pokes))
+        self.turns += 1
+        log(
+            f"  turn {'done' if result.ok else 'FAILED'} in {result.seconds:.0f}s"
+            + (f": {result.summary}" if result.summary else "")
+        )
+
     async def handle(self, wake: dict) -> None:
         env = wake.get("envelope") or {}
         who = (wake.get("from") or {}).get("label") or env.get("from")
@@ -181,7 +233,7 @@ class Relay:
         log(f'wake: {who} ({env.get("type")}) "{text[:80]}"')
         prompt = wake_prompt(self.me, wake, self.context)
         self.context = []
-        result = await self.run_turn(prompt)
+        result = await self._turn(prompt)
         self.turns += 1
         state = "done" if result.ok else "FAILED"
         log(
@@ -219,6 +271,8 @@ class Relay:
                 await asyncio.wait({consume}, timeout=self.listen_check_s)
                 if not consume.done() and self._listened():
                     return True
+                if not consume.done() and not self.idle.is_set():
+                    return None  # a local note started a turn: let the server keep the rest
             consume.result()  # raises what ended it (GatewayError, connection lost...)
             return None if not self.idle.is_set() else False
         finally:
@@ -280,9 +334,12 @@ class Relay:
         while True:
             frame = await self.queue.get()
             self.context.extend(frame.get("mailbox") or [])
-            if frame.get("kind") == "wake":
+            if frame.get("kind") in ("wake", "poke"):
                 try:
-                    await self.handle(frame)
+                    if frame.get("kind") == "poke":
+                        await self.handle_poke(frame["pokes"])
+                    else:
+                        await self.handle(frame)
                 except Exception as e:  # noqa: BLE001 - one failed turn never stops the relay
                     log(f"  turn crashed: {e!r}")
             if self.queue.empty():
@@ -323,13 +380,17 @@ class Relay:
         )
         reader = asyncio.create_task(self._reader())
         worker = asyncio.create_task(self._worker())
+        poker = asyncio.create_task(self._poker())
         try:
-            done, _ = await asyncio.wait({reader, worker}, return_when=asyncio.FIRST_EXCEPTION)
+            done, _ = await asyncio.wait(
+                {reader, worker, poker}, return_when=asyncio.FIRST_EXCEPTION
+            )
             for t in done:
                 t.result()
         finally:
             reader.cancel()
             worker.cancel()
+            poker.cancel()
             self._clear_instance()
             await self.gw.release()
             await self.gw.close()

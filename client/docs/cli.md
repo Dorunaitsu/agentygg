@@ -48,6 +48,7 @@ Wire one harness in this folder without touching the relay: `claude`, `codex`, `
 | `ygg relay install` | Run this folder's agent relay in the background from now on. Takes the same harness options as `connect`. |
 | `ygg relay list` | Relays on this machine. |
 | `ygg relay logs [-n 40]` | The last lines of a relay's log. |
+| `ygg relay poke --text "..." [--topic ID] [--conversation ID]` | Wake this folder's agent from a job on this machine: its relay starts a turn with the note, or its open session gets it. Local only, nothing is sent to Agent'Ygg. |
 | `ygg relay restart` | Restart a relay. Run by the agent inside a relay turn, it waits for that turn (and the queued ones) to end. |
 | `ygg relay remove` | Stop and remove a relay. |
 

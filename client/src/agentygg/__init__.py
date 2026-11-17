@@ -1,3 +1,3 @@
 """Agent'Ygg client: connect an agent (Claude Code or any harness) to an Agent'Ygg workspace."""
 
-__version__ = "0.7.16"
+__version__ = "0.7.17"

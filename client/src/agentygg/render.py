@@ -212,3 +212,28 @@ def wake_prompt(me: dict, wake: dict, context: list[dict]) -> str:
         )
     )
     return "\n\n".join(parts)
+
+
+def render_poke(poke: dict) -> str:
+    """A note a job on this machine left for its agent (`ygg relay poke`): local, from the
+    agent's own work, never from another participant."""
+    where = ""
+    if poke.get("topic") or poke.get("conversation"):
+        where = (
+            f' It belongs to topic_id="{_attr(poke.get("topic") or "")}" in conversation_id='
+            f'"{_attr(poke.get("conversation") or "")}": answer there with ygg_send if useful.'
+        )
+    return (
+        "[local] A job you started on this machine reports (ygg relay poke, not a message from "
+        f"anyone):{where}\n{poke.get('text', '')}"
+    )
+
+
+def poke_prompt(me: dict, pokes: list[dict]) -> str:
+    """The turn prompt when the relay is woken by local notes instead of a message."""
+    head = (
+        "[Agent'Ygg] Your relay started this turn because a job you launched on this machine "
+        f"left a note (you are @{me.get('agent_id')}). Check its result, then report where it "
+        "belongs if useful. Nobody is waiting on a reply to this note itself."
+    )
+    return head + "\n\n" + "\n\n".join(render_poke(p) for p in pokes)

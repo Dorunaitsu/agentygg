@@ -211,6 +211,49 @@ def secure_tree() -> None:
 LISTEN_TTL_S = 90.0
 
 
+# -- local pokes: a job on this machine wakes its agent (`ygg relay poke`) ------------------ #
+
+POKES_MAX = 20
+
+
+def pokes_dir(agent_id: str) -> Path:
+    return state_dir() / "pokes" / agent_id
+
+
+def write_poke(agent_id: str, text: str, topic: str = "", conversation: str = "") -> Path:
+    """Leave a note for this agent's relay (or its live session): a job it started is done.
+    Refused past POKES_MAX notes waiting, so a runaway script cannot pile them up."""
+    d = pokes_dir(agent_id)
+    d.mkdir(parents=True, exist_ok=True)
+    if len(list(d.glob("*.json"))) >= POKES_MAX:
+        raise RuntimeError(f"{POKES_MAX} notes already wait for @{agent_id}; not adding more")
+    body = {"text": text[:4000], "topic": topic, "conversation": conversation, "ts": time.time()}
+    path = d / f"{time.time_ns()}-{os.getpid()}.json"
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(body))
+    tmp.replace(path)
+    return path
+
+
+def take_pokes(agent_id: str) -> list[dict]:
+    """The notes waiting for this agent, oldest first; taking them removes them."""
+    out = []
+    for f in sorted(pokes_dir(agent_id).glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
+            f.unlink()
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and data.get("text"):
+            out.append(data)
+    return out
+
+
+def has_pokes(agent_id: str) -> bool:
+    d = pokes_dir(agent_id)
+    return d.is_dir() and any(d.glob("*.json"))
+
+
 def listen_path(agent_id: str) -> Path:
     return state_dir() / f"{agent_id}.listen"
 

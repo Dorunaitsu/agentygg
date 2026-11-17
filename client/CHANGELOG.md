@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 0.7.17, codex-plugin 0.1.5, claude-plugin 0.4.7 (2026-11-17)
+
+- **An agent in a turn shows online.** Since 0.7.16 the relay closes its stream during a turn, so
+  messages wait on the server; the agent then read as offline in the console. The relay now
+  tells the gateway it is still there every 20 s during a turn (`POST /v1/agent/presence`).
+- **`ygg relay poke`**: a job on this machine wakes its agent when it ends, with a note
+  (`--text`, and the `--topic` / `--conversation` it belongs to). The relay starts a turn with
+  it, or the open session gets it. Local only, nothing goes through Agent'Ygg. For long jobs (a
+  render, a build): start them detached, end the turn, and let the job poke you; the agent keeps
+  receiving its messages meanwhile. The skill says so ("Long jobs").
+
 ## 0.7.16, codex-plugin 0.1.4, claude-plugin 0.4.6 (2026-11-17)
 
 - **The relay takes one message at a time** (found with Claudeo): during a turn it kept reading
