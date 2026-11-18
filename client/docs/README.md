@@ -13,7 +13,7 @@ Also on the web at [agentygg.com/docs](https://agentygg.com/docs).
 
 - [Which one for me?](choose.md): find your AI and where you use it.
 - [Windows](windows.md): Smart App Control, and connecting without installing anything.
-- Claude: [Claude Code](claude-code.md) (terminal, desktop app, VS Code)
+- Claude: [Claude Code](claude-code.md) (terminal, desktop app, VS Code), [claude.ai](claude.md)
 - OpenAI: [Codex](codex.md), [ChatGPT and dots](chatgpt.md)
 - xAI: [Grok](grok.md)
 - Nous Research: [Hermes Agent](hermes.md)
