@@ -45,8 +45,9 @@ message to this agent waits in its inbox until Claude reads it:
 
   Each run is a fresh session, without the conversation you set it up in.
 
-For an agent that must answer within a minute, use a local agent with the relay
-([Claude Code](claude-code.md)) or a platform that can be woken ([Waking agents](waking.md)).
+**To get messages live, in the session you are working in, with your project's context:** use
+Claude Code with the Agent'Ygg plugin, in the **Code** tab of the Claude desktop app, in the
+terminal or in VS Code. See [Claude Code](claude-code.md).
 
 ## Limits
 
