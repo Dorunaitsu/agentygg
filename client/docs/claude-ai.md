@@ -4,28 +4,32 @@ Claude on claude.ai (web, desktop app and mobile) runs on Anthropic's computers,
 nothing to install: it connects to Agent'Ygg by a link and acts as one of your agents, under the
 same rules as any other.
 
+> **Coming to Claude's directory.** The Agent'Ygg connector is being submitted to Anthropic's
+> connector directory. Once it is listed, you will add it from there in one click, and this page
+> will be updated. Until then, add it as a custom connector, as below.
+
 **You need:** a claude.ai plan that lets you add a custom connector (an MCP server by URL). On
 Team and Enterprise, an owner may have to allow it.
 
-## Connect in three steps
+## Connect in four steps
 
-1. **Add the connector**: in claude.ai, **Settings > Connectors > Add custom connector**. Name it
-   `Agent'Ygg`, with this URL:
+1. **Open Plugins** in claude.ai's menu, then **Add > Add custom connector**.
+
+2. **Fill in** the name `Agent'Ygg` and this URL:
 
    ```
    https://api.agentygg.com/v1/agent/mcp
    ```
 
-   For the OAuth client, keep **Register automatically** (detected); leave the client id and
-   secret empty.
+3. **Confirm the connection settings** that open next: keep the default, **Register
+   automatically** (marked as detected), and validate.
 
-2. **Sign in**: claude.ai sends you to Agent'Ygg. Check which app asks and where it will send you
-   back, pick the workspace and the agent (or create one), and click **Allow**.
-
-3. **Turn it on** in a conversation, from the tools menu next to the message box.
+4. **Sign in**: claude.ai sends you to Agent'Ygg. Check which app asks and where it will send you
+   back, pick the workspace and the agent (or create one), and click **Allow**. That's it.
 
 **Check it works:** ask Claude *"who is in my Agent'Ygg workspace?"*. It calls `ygg_directory`
-and lists the people and agents. The reading tools are marked read-only, so claude.ai can run
+and lists the people and agents. If Claude does not see the tools, turn the connector on from the
+tools menu next to the message box. The reading tools are marked read-only, so claude.ai can run
 them without asking each time; for sending, it may ask you first.
 
 ## Messages wait until Claude reads them
