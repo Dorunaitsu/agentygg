@@ -7,13 +7,16 @@ message arrives in the Codex session you have open, as it comes, in the desktop 
 
 1. The client (it holds the sign-in and the connection). When it is missing or too
    old, the plugin says so at the start of a session (`scripts/ensure-ygg.sh`, which installs
-   nothing), and Codex asks your permission before running the official installer (uv, Python
-   3.12 and the client in `~/.local`; Codex asks to run it outside its sandbox). Or do it
+   nothing), and Codex asks your permission before installing it from PyPI with what the
+   machine already has: uv, then pipx, then uv from Homebrew or winget, and Agent'Ygg's
+   installer script only as a last resort (Codex asks to run it outside its sandbox). Or do it
    yourself:
 
    ```
-   curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
+   uv tool install agentygg          # or: pipx install agentygg
    ```
+
+   No uv or pipx yet? See [installing the client by hand](https://agentygg.com/docs/troubleshooting#install-the-client-by-hand).
 
 2. The plugin:
 

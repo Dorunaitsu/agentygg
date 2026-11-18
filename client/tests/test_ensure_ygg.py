@@ -3,6 +3,7 @@
 installing it (the harness's approval prompt is the consent)."""
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -22,22 +23,34 @@ SCRIPTS = [
 pytestmark = pytest.mark.skipif(os.name == "nt" or not SCRIPTS, reason="POSIX plugins only")
 
 
-def _run(tmp_path, ygg_version: str | None):
-    tmp_path = tmp_path / f"run-{ygg_version}"
+def _tools(tmp_path):
+    """Only what the script needs from the system, so the runner's own uv/pipx/brew stay out."""
+    sys_bin = tmp_path / "sys"
+    sys_bin.mkdir(exist_ok=True)
+    for tool in ("awk", "uname"):
+        link = sys_bin / tool
+        if not link.exists():
+            link.symlink_to(shutil.which(tool))
+    return sys_bin
+
+
+def _run(tmp_path, ygg_version: str | None, have: tuple[str, ...] = ()):
+    tmp_path = tmp_path / f"run-{ygg_version}-{'-'.join(have) or 'bare'}"
     home = tmp_path / "home"
     (home / ".local" / "bin").mkdir(parents=True)
     bin_ = tmp_path / "bin"
     bin_.mkdir()
+    called = tmp_path / "called"
     if ygg_version:
         y = bin_ / "ygg"
         y.write_text(f"#!/bin/sh\necho 'agentygg {ygg_version}'\n")
         y.chmod(0o755)
-    called = tmp_path / "curl-called"
-    curl = bin_ / "curl"  # must never run: nothing is installed without the user
-    curl.write_text(f"#!/bin/sh\ntouch {called}\n")
-    curl.chmod(0o755)
-    env = {"HOME": str(home), "PATH": f"{bin_}:/usr/bin:/bin"}
-    r = subprocess.run(["sh", str(SCRIPTS[0])], env=env, capture_output=True, text=True)
+    for tool in ("curl", *have):  # none may run: nothing is installed without the user
+        t = bin_ / tool
+        t.write_text(f"#!/bin/sh\necho {tool} >> {called}\n")
+        t.chmod(0o755)
+    env = {"HOME": str(home), "PATH": f"{bin_}:{_tools(tmp_path.parent)}"}
+    r = subprocess.run(["/bin/sh", str(SCRIPTS[0])], env=env, capture_output=True, text=True)
     assert not called.exists()
     return r
 
@@ -56,7 +69,6 @@ def test_an_older_client_asks_the_user_first(tmp_path):
     r = _run(tmp_path, "0.7.9")
     assert r.returncode == 0 and "is 0.7.9, older than" in r.stdout
     assert "ask your user whether you may update it" in r.stdout
-    assert "curl -fsSL https://agentygg.com/install.sh | sh" in r.stdout
 
 
 def test_a_missing_client_asks_the_user_first(tmp_path):
@@ -64,6 +76,22 @@ def test_a_missing_client_asks_the_user_first(tmp_path):
     assert r.returncode == 0 and "is not installed" in r.stdout
     assert "Nothing was installed" in r.stdout and "outside any sandbox" in r.stdout
     assert not r.stdout.startswith(("[", "{"))  # Codex reads such output as JSON
+
+
+def test_the_install_offer_follows_what_the_machine_has(tmp_path):
+    uv = _run(tmp_path, None, ("uv",)).stdout
+    assert "uv tool install --force --python 3.12 agentygg==" in uv and "install.sh" not in uv
+    pipx = _run(tmp_path, None, ("pipx",)).stdout
+    assert "pipx install --force agentygg==" in pipx and "install.sh" not in pipx
+    brew = _run(tmp_path, None, ("brew",)).stdout
+    assert "brew install uv" in brew and "uv tool install" in brew and "install.sh" not in brew
+    bare = _run(tmp_path, None).stdout
+    assert "last resort" in bare and "curl -fsSL https://agentygg.com/install.sh | sh" in bare
+
+
+def test_the_offered_version_is_the_client_version():
+    version = (ROOT / "pyproject.toml").read_text().split('version = "')[1].split('"')[0]
+    assert f'LATEST="{version}"' in SCRIPTS[0].read_text()
 
 
 def test_a_relay_turn_is_left_alone(tmp_path):

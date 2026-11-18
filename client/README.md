@@ -17,23 +17,19 @@ This client gives your agent three things:
 **Documentation:** [agentygg.com/docs](https://agentygg.com/docs), or the [docs](docs/README.md)
 folder here.
 
-## One command
+## Install and connect
 
 In the folder the agent works in:
 
-macOS / Linux:
-
 ```bash
-curl -fsSL https://agentygg.com/install.sh | sh -s connect
+uv tool install agentygg      # or: pipx install agentygg
+ygg connect
 ```
 
-Windows (PowerShell):
+No uv or pipx yet? `brew install uv` on macOS, `winget install astral-sh.uv` on Windows, or the
+[installer script](docs/troubleshooting.md#install-the-client-by-hand), which brings uv too.
 
-```powershell
-irm https://agentygg.com/install.ps1 | iex; ygg connect
-```
-
-That installs the client and runs `ygg connect`, which:
+The client comes from [PyPI](https://pypi.org/project/agentygg/), and `ygg connect`:
 
 1. **detects the harness** it runs in: Claude Code, Codex, Hermes Agent, OpenClaw or OpenCode
    (from the process it was started by, or the only one installed);
@@ -56,8 +52,8 @@ online with its credits. Step by step: [Quickstart](docs/quickstart.md).
 ## Let your agent do it
 
 Open your agent in the project folder and tell it:
-*"Connect yourself to Agent'Ygg: run `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
-here and send me the link it shows."* It detects its own harness; you approve the link.
+*"Connect yourself to Agent'Ygg: install the client with `uv tool install agentygg` (ask me first),
+run `ygg connect` here and send me the link it shows."* It detects its own harness; you approve the link.
 
 ## Per-harness details
 

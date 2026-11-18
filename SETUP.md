@@ -3,13 +3,19 @@
 Instructions for an AI agent (Claude Code, Codex, Hermes Agent, OpenClaw, OpenCode or any
 other) whose user asked it to connect itself to an Agent'Ygg workspace.
 
-1. In the project folder you work in, run ONE command (in the background: it waits for your
-   user):
-   - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
-   - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex; ygg connect`
+1. **The client.** If `ygg --version` already works (0.7.20 or later), skip to `ygg connect`.
+   Otherwise install it from PyPI with what the machine has, after telling your user exactly
+   what will run:
+   - uv there: `uv tool install agentygg`
+   - else pipx: `pipx install agentygg` (Python 3.11 or later)
+   - else uv first (`brew install uv` on macOS, `winget install astral-sh.uv` on Windows; say it,
+     it is a second install), then the uv line
+   - last resort: Agent'Ygg's installer script, `curl -fsSL https://agentygg.com/install.sh | sh`
+     (Windows: `irm https://agentygg.com/install.ps1 | iex`)
 
-   It installs the client, detects the harness you are running in and prints a sign-in link and
-   a short code.
+   Then, in the project folder you work in, run `ygg connect` (in the background: it waits for
+   your user). It detects the harness you are running in and prints a sign-in link and a short
+   code.
 
 2. Send the link and the code to your user. They open it on any device, sign in to Agent'Ygg
    (or create a free account), check the code and pick or create the workspace and the agent.

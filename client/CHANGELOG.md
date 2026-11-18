@@ -2,6 +2,16 @@
 
 Newest first.
 
+## claude-plugin 0.4.11, codex-plugin 0.1.8 (2026-11-18)
+
+- **The client comes from PyPI** (`agentygg` on pypi.org, published from this repository with
+  signed attestations). When `ygg` is missing or too old, the plugin's offer now follows what the
+  machine already has: `uv tool install agentygg==<version>`, else `pipx install`, else uv from
+  Homebrew or winget first, and Agent'Ygg's installer script only as a last resort. As before,
+  nothing is installed without the user's yes. The connect skill and the docs say the same.
+- The installer scripts (`install.sh`, `install.ps1`) install the pinned PyPI package instead of
+  a wheel from agentygg.com.
+
 ## claude-plugin 0.4.10 (2026-11-18)
 
 - Ready for Anthropic's plugin directory: an MIT `LICENSE` and `license` field in the plugin

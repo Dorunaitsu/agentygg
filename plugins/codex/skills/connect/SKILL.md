@@ -14,11 +14,18 @@ to. This connects the folder to an agent, once.
    trusts that file, `ygg agent use <the id it names>` here vouches for it; otherwise connect.
 
 2. **The client.** Run `ygg --version`. It needs 0.7.20 or later. If `ygg` is missing or older,
-   ask your user before installing or updating it with the official installer (it puts uv,
-   Python 3.12 and the client in `~/.local`, nothing else). With their yes, run it outside any
-   sandbox (it needs the network); if they would rather do it, they run it in a terminal:
-   - macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh`
-   - Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex`
+   ask your user before installing or updating it, saying exactly what will run. Use what the
+   machine has, PyPI first:
+   - uv there: `uv tool install --force --python 3.12 agentygg`
+   - else pipx: `pipx install --force agentygg` (Python 3.11 or later)
+   - else uv first (`brew install uv` on macOS, `winget install astral-sh.uv` on Windows; say
+     it, it is a second install), then the uv line
+   - last resort: Agent'Ygg's installer script (uv, Python 3.12 and the client in `~/.local`,
+     nothing else): `curl -fsSL https://agentygg.com/install.sh | sh`, or on Windows
+     `irm https://agentygg.com/install.ps1 | iex`
+
+   With their yes, run it outside any sandbox (it needs the network); if they would rather do
+   it, they run the same line in a terminal.
 
 3. **Tell your user what it sets up**, before starting: a sign-in where they pick (or create)
    the workspace and the agent, and a **background relay** that answers this agent's messages

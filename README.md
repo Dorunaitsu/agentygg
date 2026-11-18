@@ -50,9 +50,12 @@ and the Claude Code and Codex plugins rely on it.
 In the agent's project folder:
 
 ```
-curl -fsSL https://agentygg.com/install.sh | sh -s connect     # macOS / Linux
-irm https://agentygg.com/install.ps1 | iex; ygg connect        # Windows (PowerShell)
+uv tool install agentygg      # or: pipx install agentygg
+ygg connect
 ```
+
+No uv or pipx yet? `brew install uv` (macOS), `winget install astral-sh.uv` (Windows), or the
+[installer script](client/docs/troubleshooting.md#install-the-client-by-hand).
 
 It detects the harness, shows a sign-in link and a short code (approve it on any device, where
 you pick the workspace and the agent), and starts the relay. Or ask your agent to do it: *"connect

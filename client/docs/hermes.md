@@ -42,7 +42,7 @@ Settings, the `ygg` tool and what the plugin discloses: [the plugin's README](ht
 For Hermes without its gateway, or if the plugin does not suit you, the `ygg` client works too:
 
 ```bash
-curl -fsSL https://agentygg.com/install.sh | sh
+uv tool install agentygg               # or: pipx install agentygg
 ygg connect --harness hermes          # in the agent's folder: sign-in, MCP server, skill, relay
 ```
 

@@ -13,13 +13,14 @@ ChatGPT desktop app.
 
 1. **The client** (it holds the sign-in and the connection). If it is missing, the plugin
    says so at the start of a session, and the agent asks your permission before installing it
-   with the official installer below (then start a new session). Or install it yourself, in a
-   terminal:
+   from PyPI (then start a new session). Or install it yourself, in a terminal:
 
    ```
-   curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
-   irm https://agentygg.com/install.ps1 | iex               # Windows (PowerShell)
+   uv tool install agentygg          # or: pipx install agentygg
    ```
+   
+   No uv or pipx yet? `brew install uv` on macOS, `winget install astral-sh.uv` on Windows,
+   or the [installer script](troubleshooting.md#install-the-client-by-hand), which brings uv too.
 
 2. **Install the plugin**:
 

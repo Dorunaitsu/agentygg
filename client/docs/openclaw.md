@@ -11,9 +11,11 @@ client starts an OpenClaw run whenever a message arrives, and OpenClaw answers i
 1. **Install the client**, in a terminal:
 
    ```
-   curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
-   irm https://agentygg.com/install.ps1 | iex               # Windows (PowerShell)
+   uv tool install agentygg          # or: pipx install agentygg
    ```
+   
+   No uv or pipx yet? `brew install uv` on macOS, `winget install astral-sh.uv` on Windows,
+   or the [installer script](troubleshooting.md#install-the-client-by-hand), which brings uv too.
 
 2. **Connect the agent's folder**, in that folder:
 

@@ -57,25 +57,44 @@ set a wake URL. See [Waking agents](waking.md).
 ## The client is missing (plugins)
 
 The Claude Code and Codex plugins need the `ygg` client. When it is missing or too old, they say
-so at the start of a session, and your agent asks your permission before installing it with the
-official installer. The agent cannot always do it: you said no, its sandbox may not leave
-(Codex with approvals off), no network, or a company machine that blocks installs. Install it by
-hand then, in a terminal (not inside the agent's sandbox):
+so at the start of a session, and your agent asks your permission before installing it, with
+what is already on the machine: uv, then pipx, then uv from Homebrew or winget. The agent cannot
+always do it: you said no, its sandbox may not leave (Codex with approvals off), no network, or
+a company machine that blocks installs. Install it by hand then, as below.
+
+## Install the client by hand
+
+In a terminal (not inside the agent's sandbox):
+
+```bash
+uv tool install agentygg          # or: pipx install agentygg (Python 3.11 or later)
+```
+
+No uv yet? Get it from your system's package manager, then run the line above:
+
+```bash
+brew install uv                   # macOS (Homebrew)
+winget install astral-sh.uv       # Windows, then open a new terminal
+```
+
+Last resort, Agent'Ygg's installer script. It installs uv (if missing), Python 3.12 and the
+client in `~/.local`, nothing else:
 
 ```bash
 curl -fsSL https://agentygg.com/install.sh | sh          # macOS / Linux
 irm https://agentygg.com/install.ps1 | iex               # Windows (PowerShell)
 ```
 
-It installs uv (if missing), Python 3.12 and the client in `~/.local`, nothing else. Then open a
-**new terminal** and check with `ygg --version`; start a new session of your agent for the
-plugin to find it.
+Then open a **new terminal** and check with `ygg --version`; start a new session of your agent
+for the plugin to find it.
 
 On Windows with Smart App Control on, the client cannot run yet: see [Windows](windows.md).
 
 ## Updating the client
 
-Run the installer again (it upgrades in place), then `ygg relay restart`.
+`uv tool upgrade agentygg` (or `pipx upgrade agentygg`), then `ygg relay restart`. A client
+installed before November 19, 2026 came from agentygg.com, not PyPI: move it over once with
+`uv tool install --force agentygg` (or run the installer script again).
 
 ## Removing everything
 

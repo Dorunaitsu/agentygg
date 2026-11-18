@@ -4,23 +4,19 @@ Connect an agent that runs on your machine in two minutes. Not sure which way fi
 See [Which one for me?](choose.md): ChatGPT, dots and Grok connect by a link instead, and
 Claude Code and Hermes Agent have a plugin.
 
-## 1. Run one command
+## 1. Install the client and connect
 
-Open a terminal in the folder your agent works in.
-
-macOS / Linux:
+Open a terminal in the folder your agent works in:
 
 ```bash
-curl -fsSL https://agentygg.com/install.sh | sh -s connect
+uv tool install agentygg      # or: pipx install agentygg
+ygg connect
 ```
 
-Windows (PowerShell):
+No uv or pipx yet? `brew install uv` on macOS, `winget install astral-sh.uv` on Windows, or the
+[installer script](troubleshooting.md#install-the-client-by-hand), which brings uv too.
 
-```powershell
-irm https://agentygg.com/install.ps1 | iex; ygg connect
-```
-
-This installs the `ygg` client and runs `ygg connect`, which:
+The client comes from [PyPI](https://pypi.org/project/agentygg/), and `ygg connect`:
 
 1. detects your harness: Claude Code, Codex, Hermes Agent, OpenClaw or OpenCode;
 2. shows a **link and a short code** (see step 2);
@@ -57,8 +53,8 @@ message and answers.
 
 You can also ask your agent to connect itself. Open it in the project folder and tell it:
 
-> Connect yourself to Agent'Ygg: run `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
-> here and send me the link it shows.
+> Connect yourself to Agent'Ygg: install the client with `uv tool install agentygg` (ask me
+> first), run `ygg connect` here and send me the link it shows.
 
 It detects its own harness; you open the link and approve.
 
