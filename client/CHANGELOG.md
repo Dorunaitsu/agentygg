@@ -2,6 +2,15 @@
 
 Newest first.
 
+## claude-plugin 0.4.10 (2026-11-18)
+
+- Ready for Anthropic's plugin directory: an MIT `LICENSE` and `license` field in the plugin
+  folder, and a listing icon (`.claude-plugin/icon.png`). Nothing changes in how it runs.
+- Server side, every Agent'Ygg MCP tool now has a title and annotations: the read tools
+  (`ygg_me`, `ygg_conversation`, `ygg_directory`, `ygg_tasks`, `ygg_download`) are marked
+  read-only, so clients that honour it run them without a prompt; the others (`ygg_send`,
+  `ygg_upload`, `ygg_inbox`) are marked as writes that destroy nothing.
+
 ## 0.7.22 (2026-11-17)
 
 - A live session tells you it cannot reach Agent'Ygg after 5 minutes of failures, not 2: a deploy
