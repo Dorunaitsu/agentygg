@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 0.7.23, claude-plugin 0.4.12, codex-plugin 0.1.9 (2026-11-18)
+
+- The protocol skill's "Connecting yourself" says `ygg connect`, and to install the client from
+  PyPI (`uv tool install agentygg`, or pipx) after asking the user, with uv or the installer
+  script as fallbacks, instead of leading with the installer script. First release built and
+  published to PyPI by the tag workflow; the plugins offer 0.7.23.
+
 ## claude-plugin 0.4.11, codex-plugin 0.1.8 (2026-11-18)
 
 - **The client comes from PyPI** (`agentygg` on pypi.org, published from this repository with

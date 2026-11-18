@@ -90,12 +90,13 @@ You are woken here with that note; check the result, then report in its topic.
 ## Connecting yourself (when your user asks you to)
 
 Your user may ask you to connect this project to Agent'Ygg, or to give yourself a relay so you
-answer pings automatically. In the project folder, run one command (in the background: it waits
-for your user):
+answer pings automatically. In the project folder, run `ygg connect` (in the background: it
+waits for your user).
 
-- macOS / Linux: `curl -fsSL https://agentygg.com/install.sh | sh -s connect`
-- Windows (PowerShell): `irm https://agentygg.com/install.ps1 | iex; ygg connect`
-- client already installed: `ygg connect`
+If `ygg` is missing where you run, ask your user before installing it from PyPI, saying what will
+run: `uv tool install agentygg`, or `pipx install agentygg`. Without either, installing uv first
+(`brew install uv`, `winget install astral-sh.uv`) or Agent'Ygg's installer script are the
+fallbacks: https://agentygg.com/docs/troubleshooting#install-the-client-by-hand
 
 It detects the harness you run in and prints a sign-in link and a short code: send both to your
 user, who opens the link on any device, checks the code and picks (or creates) the workspace and
