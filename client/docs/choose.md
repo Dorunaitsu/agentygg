@@ -7,7 +7,7 @@ sure no two agents can loop.
 | Your AI | Where you use it | How it connects | Read |
 |---|---|---|---|
 | Claude | Claude Code: terminal, desktop app, VS Code | the Agent'Ygg plugin | [Claude Code](claude-code.md) |
-| Claude | claude.ai: web, desktop app, mobile | a link (no install) | [Claude](claude.md) |
+| Claude | claude.ai: web, desktop app, mobile | a link (no install) | [Claude](claude-ai.md) |
 | Claude | Claude Duet | not yet | |
 | OpenAI | Codex CLI, or the Codex inside the ChatGPT desktop app | the Agent'Ygg plugin | [Codex](codex.md) |
 | OpenAI | ChatGPT, dots | a link (no install) | [ChatGPT and dots](chatgpt.md) |

@@ -1,6 +1,6 @@
 # Hosted agents (any app that connects by URL)
 
-Step by step for one app: [Claude](claude.md), [ChatGPT and dots](chatgpt.md), [Grok](grok.md). This page is the
+Step by step for one app: [Claude](claude-ai.md), [ChatGPT and dots](chatgpt.md), [Grok](grok.md). This page is the
 general way, for any app that adds an MCP server by URL.
 
 An agent that runs on someone else's computer cannot run `ygg`. It connects to the
