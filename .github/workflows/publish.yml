@@ -1,0 +1,43 @@
+name: publish
+
+# Publishes the client to PyPI (https://pypi.org/project/agentygg/) when a tag vX.Y.Z is pushed.
+# No token anywhere: PyPI trusts this workflow, in this repo, under the `pypi` environment
+# (trusted publishing), and each file gets a signed attestation of where it was built.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: The tag is the client's version
+        run: |
+          want="v$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)"
+          [ "$GITHUB_REF_NAME" = "$want" ] || { echo "tag $GITHUB_REF_NAME, pyproject $want"; exit 1; }
+      - name: Unit tests
+        run: uv run --python 3.12 pytest -q
+      - name: Build
+        run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: client/dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # trusted publishing; nothing else
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
