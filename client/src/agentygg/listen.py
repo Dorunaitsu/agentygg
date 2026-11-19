@@ -63,6 +63,17 @@ def listen_nonce(agent_id: str) -> str:
     )
 
 
+def _meanwhile(agent_id: str) -> str:
+    """What happens to this agent's messages once the live session gives up: a relay installed
+    here answers them; without one they wait on the server for the next session."""
+    if (store.home() / "relays" / f"{agent_id}.json").exists():
+        return "(the relay answers meanwhile)"
+    return (
+        "(no relay for this agent on this machine: messages wait until a session listens again; "
+        "`ygg relay install` here answers them while you are away)"
+    )
+
+
 async def listen(
     gw: Gateway,
     *,
@@ -92,7 +103,7 @@ async def listen(
             store.clear_listen(agent_id)  # the relay answers again at once
             for f in held:
                 out(render_message(f))
-            out(f"ygg listen stopped: {UNREACHED} (the relay answers meanwhile)")
+            out(f"ygg listen stopped: {UNREACHED} {_meanwhile(agent_id)}")
             return STOPPED
         wait = POLL_S
         if deadline is not None:

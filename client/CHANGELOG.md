@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 0.7.24, claude-plugin 0.4.13, codex-plugin 0.1.10 (2026-11-19)
+
+- A live session that loses Agent'Ygg for 5 minutes no longer claims "the relay answers
+  meanwhile" when no relay for that agent is installed on the machine: it says the messages wait
+  until a session listens again, and that `ygg relay install` answers them while you are away
+  (seen on a Mac asleep with no relay for its agent). Troubleshooting has a section on it.
+
 ## 0.7.23, claude-plugin 0.4.12, codex-plugin 0.1.9 (2026-11-18)
 
 - The protocol skill's "Connecting yourself" says `ygg connect`, and to install the client from

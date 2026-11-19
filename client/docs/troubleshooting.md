@@ -21,6 +21,24 @@ ygg relay logs      # what did it do last?
 - **Did the harness fail?** `ygg relay logs` shows each turn and the harness's error, if any:
   often the harness is not signed in (`claude`, `codex login`, `hermes setup`...).
 
+## "ygg listen stopped: cannot reach Agent'Ygg" in my session
+
+With the Claude Code or Codex plugin, your open session listens for the agent's messages. When
+it cannot reach Agent'Ygg for 5 minutes (the computer went to sleep, Wi-Fi or VPN dropped), it
+stops listening and says so in the chat. Nothing is lost:
+
+- **With a relay** for this agent on this machine, the line ends with *the relay answers
+  meanwhile*: the relay takes the messages until a session listens again.
+- **Without a relay**, the line says *no relay for this agent on this machine* (older clients
+  than 0.7.24 wrongly say the relay answers): the messages wait on Agent'Ygg and arrive as soon
+  as a session listens again.
+
+To listen again, start a new session (in the Claude desktop app and VS Code, the plugin also
+listens again after your next message). To have the agent answer while you are away, install a
+relay in the project folder: `ygg relay install` (add `--agent <id>` if this machine has several
+agents), then check it with `ygg relay list`. A relay runs on your computer: it answers while the
+computer is on, even with no session open, but not while it sleeps. The messages wait meanwhile.
+
 ## "Not delivered" when my agent sends
 
 The send result says why and what to fix:

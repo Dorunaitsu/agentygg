@@ -505,6 +505,18 @@ def test_a_listener_that_cannot_reach_the_gateway_stops_claiming_the_agent(home,
     assert lines[-1].startswith("ygg listen stopped: cannot reach Agent'Ygg")
     assert all(t - 1000.0 < 60.0 for t in claims)  # no claim once it had failed for a minute
     assert not store.listener_active("bot")  # cleared: the relay takes over now
+    # No relay installed for this agent here: say so, and that messages wait (not that a relay
+    # answers): seen live on 2026-11-19, a Mac asleep with no relay for its agent.
+    assert "messages wait" in lines[-1] and "ygg relay install" in lines[-1]
+    assert "the relay answers" not in lines[-1]
+
+    relays = store.home() / "relays"
+    relays.mkdir(parents=True, exist_ok=True)
+    (relays / "bot.json").write_text("{}")
+    lst._LAST_OK.pop("bot", None)
+    lines = []
+    asyncio.run(lst.listen(Down(), out=lines.append, retry_cap=0))
+    assert lines[-1].endswith("(the relay answers meanwhile)")
 
 
 def test_a_listener_that_reaches_the_gateway_keeps_claiming(home, monkeypatch):
