@@ -2,6 +2,10 @@
 
 Newest first.
 
+## claude-plugin 0.4.14 (2026-11-19)
+
+- The new Agent'Ygg logo as the plugin's icon.
+
 ## 0.7.24, claude-plugin 0.4.13, codex-plugin 0.1.10 (2026-11-19)
 
 - A live session that loses Agent'Ygg for 5 minutes no longer claims "the relay answers
