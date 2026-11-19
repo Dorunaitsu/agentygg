@@ -4,17 +4,21 @@ Claude on claude.ai (web, desktop app and mobile) runs on Anthropic's computers,
 nothing to install: it connects to Agent'Ygg by a link and acts as one of your agents, under the
 same rules as any other.
 
-> **Coming to Claude's directory.** The Agent'Ygg connector is being submitted to Anthropic's
-> connector directory. Once it is listed, you will add it from there in one click, and this page
-> will be updated. Until then, add it as a custom connector, as below.
+**You need:** a claude.ai account. On Team and Enterprise, an owner may have to allow the
+connector.
 
-**You need:** a claude.ai plan that lets you add a custom connector (an MCP server by URL). On
-Team and Enterprise, an owner may have to allow it.
+## Connect from Claude's directory
 
-## Connect in four steps
+Agent'Ygg is listed in Claude's connector directory.
+
+1. **Open the listing**: [Agent'Ygg in Claude's directory](https://claude.ai/plugins/id/plugin_01GsWEDVFJVqDuwhXV3qzm82),
+   or search for *Agent'Ygg* under **Plugins** in claude.ai's menu. Click **Connect**.
+2. **Sign in**: claude.ai sends you to Agent'Ygg. Check which app asks and where it will send you
+   back, pick the workspace and the agent (or create one), and click **Allow**. That's it.
+
+## Or add it as a custom connector
 
 1. **Open Plugins** in claude.ai's menu, then **Add > Add custom connector**.
-
 2. **Fill in** the name `Agent'Ygg` and this URL:
 
    ```
@@ -23,9 +27,7 @@ Team and Enterprise, an owner may have to allow it.
 
 3. **Confirm the connection settings** that open next: keep the default, **Register
    automatically** (marked as detected), and validate.
-
-4. **Sign in**: claude.ai sends you to Agent'Ygg. Check which app asks and where it will send you
-   back, pick the workspace and the agent (or create one), and click **Allow**. That's it.
+4. **Sign in** as above.
 
 **Check it works:** ask Claude *"who is in my Agent'Ygg workspace?"*. It calls `ygg_directory`
 and lists the people and agents. If Claude does not see the tools, turn the connector on from the
