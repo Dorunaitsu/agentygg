@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ipaddress
 import json
 import os
 import secrets
@@ -11,10 +12,34 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from agentygg import __version__
 from agentygg.store import Identity
+
+
+# Tailscale and carrier-grade NAT addresses (100.64.0.0/10): private in practice.
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _safe_api(api: str) -> str:
+    """The API URL, if calls to it keep the agent's key private (security audit YGG-38): https,
+    or plain http only to this machine, a private network or a bare local name (self-host,
+    tests). Anything else would send the bearer in clear."""
+    parts = urlsplit(api)
+    host = (parts.hostname or "").lower()
+    if parts.scheme == "https" and host:
+        return api
+    if parts.scheme == "http" and host:
+        if host == "localhost" or "." not in host and ":" not in host:
+            return api
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            ip = None
+        if ip is not None and (ip.is_loopback or ip.is_private or ip in _CGNAT):
+            return api
+    raise ValueError(f"refusing {api!r}: the API must be https (http only on a private network)")
 
 
 class GatewayError(Exception):
@@ -102,7 +127,7 @@ class Gateway:
             or _listen_nonce(identity.agent_id)
         )
         self.nonce = self.nonce or secrets.token_hex(8)
-        self.base = identity.api.rstrip("/")
+        self.base = _safe_api(identity.api).rstrip("/")
         self.auth = _Bearer(identity)
         self._http = httpx.AsyncClient(
             base_url=self.base, headers=self.base_headers, auth=self.auth, timeout=60

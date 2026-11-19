@@ -9,10 +9,11 @@ resolution-markers = [
 
 [[package]]
 name = "agentygg"
-version = "0.7.24"
+version = "0.7.25"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
+    { name = "httpx2" },
     { name = "mcp" },
     { name = "qrcode" },
     { name = "websockets" },
@@ -28,7 +29,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
-    { name = "mcp", specifier = ">=2.3" },
+    { name = "httpx2", specifier = ">=2.16" },
+    { name = "mcp", specifier = ">=2.3,<3" },
     { name = "qrcode", specifier = ">=7.4" },
     { name = "websockets", specifier = ">=13" },
 ]

@@ -57,6 +57,11 @@ def active_adapter() -> AgentYggAdapter | None:
     return _active
 
 
+def _user_of(entry: Any) -> str:
+    """The person a messaging-app session is with (its origin's user id), "" when unknown."""
+    return str(getattr(entry.origin, "user_id", "") or "")
+
+
 class AgentYggAdapter(BasePlatformAdapter):
     def __init__(self, config: Any, **kwargs: Any):
         super().__init__(config=config, platform=Platform(PLATFORM))
@@ -377,6 +382,11 @@ class AgentYggAdapter(BasePlatformAdapter):
         # The app the person chose at setup (AGENTYGG_HUMAN_PLATFORM), else whichever they used
         # last. A chosen app with no conversation yet gets nothing: never another app instead.
         chosen = (get_scoped_secret("AGENTYGG_HUMAN_PLATFORM", "") or "").strip().lower()
+        # Whose it is (AGENTYGG_HUMAN_ID, their id on that app): the hand-over carries the
+        # agent's work, so it never goes to another person who happened to write last
+        # (security audit YGG-34). Not set: only when a single person writes to this agent.
+        owner = (get_scoped_secret("AGENTYGG_HUMAN_ID", "") or "").strip()
+        candidates = []
         for entry in sorted(entries, key=lambda e: e.updated_at, reverse=True):
             platform = str(getattr(entry.platform, "value", entry.platform) or "").lower()
             if platform in ("", PLATFORM, "local") or entry.chat_type != "dm":
@@ -384,8 +394,13 @@ class AgentYggAdapter(BasePlatformAdapter):
             if chosen and platform != chosen:
                 continue
             if entry.origin is not None:
-                return entry.session_key
-        return None
+                candidates.append(entry)
+        if owner:
+            return next((e.session_key for e in candidates if _user_of(e) == owner), None)
+        people = {u for u in map(_user_of, candidates) if u}
+        if len(people) > 1:
+            return None
+        return candidates[0].session_key if candidates else None
 
     async def send_typing(self, chat_id: str, metadata: Any = None) -> None:
         return None

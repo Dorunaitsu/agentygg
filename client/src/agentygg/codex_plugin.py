@@ -89,7 +89,7 @@ def _take_over(agent_id: str, thread: str) -> None:
     """Become this agent's Codex listener. The previous one notices the mark is no longer its
     own, and waits on the side (`_standby`)."""
     path = _mark(agent_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    store.private_dir(path.parent)
     path.write_text(json.dumps({"pid": os.getpid(), "thread": thread, "since": time.time()}))
 
 
@@ -112,7 +112,7 @@ def _standby(agent_id: str, thread: str, parent: int, sleep=time.sleep) -> bool:
 def _log(agent_id: str, line: str) -> None:
     with contextlib.suppress(OSError):
         p = store.logs_dir() / f"{agent_id}.codex.log"
-        p.parent.mkdir(parents=True, exist_ok=True)
+        store.private_dir(p.parent)
         with p.open("a") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {line}\n")
 

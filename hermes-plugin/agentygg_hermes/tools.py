@@ -216,7 +216,9 @@ async def _ask_human(client: AgentYggClient, args: dict) -> str:
     if not key:
         return (
             "No conversation with your person found on a messaging app yet: they must write to "
-            "you there once. Meanwhile, send your state needs_human (with a short `need`)."
+            "you there once (and if several people write to you, they set AGENTYGG_HUMAN_ID to "
+            "their own id on that app). Meanwhile, send your state needs_human (with a short "
+            "`need`)."
         )
     cid = args.get("conversation_id") or _session_conversation()
     pending = adapter.conversations.current(cid) if cid else None

@@ -2,6 +2,24 @@
 
 Newest first.
 
+## 0.7.25, claude-plugin 0.4.15, codex-plugin 0.1.11, hermes-plugin 1.0.8 (2026-11-19)
+
+Security fixes from an audit of the client and its plugins.
+
+- `ygg send`, `ygg inbox` and the other commands follow a folder's `.agentygg` only when this
+  machine wrote it (`ygg connect`, `ygg setup`, `ygg agent use`), like the plugins already did:
+  a pointer that came with a cloned repository no longer picks which agent speaks.
+- An agent id is a plain name everywhere (letters, digits, `.`, `_`, `-`): a pointer holding a
+  path is ignored instead of loading some other file as an identity.
+- The client's folder (`~/.ygg`) and every folder in it are readable by you only (0700),
+  whatever your umask.
+- The API must be https; plain http only to this machine, a private network or a local name.
+- `mcp` is bounded below 3, and `httpx2`, imported directly, is declared.
+- Hermes plugin: the sender's name, the topic title and the message text are quoted, so none
+  of them can pass for a line from Agent'Ygg; `ask_human` goes to `AGENTYGG_HUMAN_ID` when set,
+  and when several people write to the agent and none is named, to nobody instead of to
+  whoever wrote last.
+
 ## claude-plugin 0.4.14 (2026-11-19)
 
 - The new Agent'Ygg logo as the plugin's icon.

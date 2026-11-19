@@ -643,3 +643,78 @@ def test_relay_puts_its_own_ygg_on_path(tmp_path, monkeypatch):
     assert os.environ["PATH"].split(os.pathsep)[0] == str(bindir)
     cli._ygg_on_path()  # already found: unchanged
     assert os.environ["PATH"].count(str(bindir)) == 1
+
+
+def test_a_pointer_from_a_cloned_repository_does_not_pick_the_agent(tmp_path, monkeypatch):
+    """Security audit YGG-11: like the plugin, the CLI only follows a `.agentygg` this machine
+    wrote. A repository shipping one cannot make `ygg send` speak as another local agent."""
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("YGG_AGENT_ID", raising=False)
+    for aid in ("mine", "work"):
+        store.save(store.Identity(aid, "lab", _key("lab", aid)))
+    repo = tmp_path / "cloned"
+    repo.mkdir()
+    (repo / ".agentygg").write_text("work\n")  # came with the repository
+    with pytest.raises(LookupError) as e:
+        store.resolve(start=repo)
+    assert "not written by this machine" in str(e.value)
+    store.write_pointer(repo, "work")  # bound here (ygg connect / ygg agent use)
+    assert store.resolve(start=repo).agent_id == "work"
+
+
+def test_an_agent_id_never_names_a_path(tmp_path, monkeypatch):
+    """Security audit YGG-35: an id from a pointer or an argument is a plain id, never a path
+    to some other JSON file of the machine."""
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    evil = tmp_path / "evil.json"
+    evil.write_text(json.dumps({"agent_id": "x", "workspace_id": "w", "key": "k"}))
+    for bad in (str(tmp_path / "evil"), "../../evil", "a/b", "", ".hidden"):
+        with pytest.raises(LookupError):
+            store.load(bad)
+    assert store.remove("../x") is False
+    repo = tmp_path / "r"
+    repo.mkdir()
+    (repo / ".agentygg").write_text(str(tmp_path / "evil") + "\n")
+    assert store.pointer_for(repo) is None
+
+
+def test_state_files_are_private(tmp_path, monkeypatch):
+    """Security audit YGG-37: what the client writes under its folder is readable by its user
+    only, whatever the umask."""
+    if os.name == "nt":
+        pytest.skip("POSIX mode bits")
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    old = os.umask(0o022)
+    try:
+        store.save(store.Identity("solo", "lab", _key("lab", "solo")))
+        store.write_pointer(tmp_path, "solo")
+        store.touch_listen("solo", "n1")
+        store.request_restart("solo")
+        store.write_poke("solo", "hi")
+    finally:
+        os.umask(old)
+    # every folder is 0700, so nothing in it is reachable by another user; the keys are 0600
+    for p in [store.home(), *store.home().rglob("*")]:
+        if p.is_dir():
+            assert p.stat().st_mode & 0o077 == 0, p
+    assert (store.agents_dir() / "solo.json").stat().st_mode & 0o077 == 0
+
+
+def test_the_key_never_travels_in_clear_to_a_public_host():
+    """Security audit YGG-38: plain http only to this machine or a private network (self-host,
+    tests); a public host must be https, or every call would carry the key in clear."""
+    from agentygg.api import Gateway
+
+    for api in ("http://api.agentygg.com", "http://8.8.8.8:8000", "ftp://x.example"):
+        with pytest.raises(ValueError):
+            Gateway(store.Identity("a", "w", _key("w", "a"), api=api))
+    for api in (
+        "https://api.agentygg.com",
+        "http://localhost:8000",
+        "http://127.0.0.1:9",
+        "http://192.168.1.20:8000",
+        "http://100.95.1.2:8000",
+        "http://gw",
+    ):
+        gw = Gateway(store.Identity("a", "w", _key("w", "a"), api=api))
+        asyncio.run(gw.close())

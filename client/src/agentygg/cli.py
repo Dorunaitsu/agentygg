@@ -785,7 +785,7 @@ def _hook_listen(args) -> None:
         pid = int(mark.read_text().strip())
         if pid != os.getpid() and store.pid_alive(pid):
             raise SystemExit(0)  # this session's listener is already waiting
-    mark.parent.mkdir(parents=True, exist_ok=True)
+    store.private_dir(mark.parent)
     mark.write_text(str(os.getpid()))
 
     def _term(*_):

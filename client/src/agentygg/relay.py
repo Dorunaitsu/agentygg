@@ -110,7 +110,7 @@ class Relay:
 
     def _save_session(self, session_id: str) -> None:
         p = self._state_path()
-        p.parent.mkdir(parents=True, exist_ok=True)
+        store.private_dir(p.parent)
         p.write_text(
             json.dumps(
                 {"session_id": session_id, "workdir": str(self.workdir), "harness": self.h.kind}
@@ -119,7 +119,7 @@ class Relay:
 
     def _publish_instance(self) -> None:
         p = instance_path(self.identity.agent_id)
-        p.parent.mkdir(parents=True, exist_ok=True)
+        store.private_dir(p.parent)
         p.write_text(json.dumps({"nonce": self.gw.nonce, "pid": os.getpid()}))
 
     def _clear_instance(self) -> None:

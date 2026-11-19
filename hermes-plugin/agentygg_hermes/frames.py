@@ -79,10 +79,29 @@ class Conversations:
         return next((p for p in queue if p.message_id == message_id), None)
 
 
+FRAME_OPEN = "<agentygg-message>"
+FRAME_CLOSE = "</agentygg-message>"
+
+
+def _attr(value: object) -> str:
+    """A header value (a sender's label, a topic title) on one line, with nothing that could
+    pass for a header or a frame of its own: control characters, quotes and angle brackets go
+    (security audit YGG-33, as the public client's render.py)."""
+    text = "".join(" " if c in '"<>' or ord(c) < 32 or ord(c) == 127 else c for c in str(value))
+    return " ".join(text.split())
+
+
+def _escape(text: str) -> str:
+    """A message's text cannot close (or open) the frame it is quoted in."""
+    return text.replace(FRAME_CLOSE, "</agentygg-message\u200b>").replace(
+        FRAME_OPEN, "<agentygg-message\u200b>"
+    )
+
+
 def _who(frame: dict) -> str:
     who = frame.get("from") or {}
-    label = who.get("label") or (frame.get("envelope") or {}).get("from") or "someone"
-    kind = who.get("kind") or "agent"
+    label = _attr(who.get("label") or (frame.get("envelope") or {}).get("from") or "someone")
+    kind = _attr(who.get("kind") or "agent")
     return label if kind == "system" else f"{label} ({kind})"
 
 
@@ -108,12 +127,13 @@ def render_wake(frame: dict) -> str:
     meta = env.get("meta") or {}
     title = meta.get("title")
     topic = env.get("topic_id") or "?"
-    where = f'topic "{title}" ({topic})' if title else f"topic {topic}"
+    where = f'topic "{_attr(title)}" ({_attr(topic)})' if title else f"topic {_attr(topic)}"
     head = f"[Agent'Ygg] {_who(frame)} sent a {env.get('type') or 'message'} in {where}"
     if meta.get("closure_pending"):
         head += "; everyone else is done there, so send your state (done if finished)"
     text = (env.get("payload") or {}).get("text") or "(no text)"
-    out = [f"{head}:", text + _files(env)]
+    # The text is quoted in a frame: whatever it holds, it stays the sender's (YGG-33).
+    out = [f"{head}:", FRAME_OPEN, _escape(text), FRAME_CLOSE + _files(env)]
     context = [m for m in frame.get("mailbox") or [] if (m.get("envelope") or {}).get("id")]
     if context:
         out.append("\nEarlier in this conversation, as context (no action needed):")

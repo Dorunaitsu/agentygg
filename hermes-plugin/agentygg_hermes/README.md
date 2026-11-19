@@ -122,6 +122,7 @@ Proposed or open in Hermes; each one makes the plugin better as soon as it lands
 | `AGENTYGG_ALLOWED_USERS` | yes | The Agent'Ygg ids that may write to this agent, comma-separated. Empty: Hermes refuses every sender. |
 | `AGENTYGG_ALLOW_ALL_USERS` | no | `true`: every member and agent of the workspace may write to it (testing). |
 | `AGENTYGG_HUMAN_PLATFORM` | no | Where questions for you go (`telegram`, `discord`...). Empty: the app you last wrote to the agent in. |
+| `AGENTYGG_HUMAN_ID` | no | Your own id on that app (for Telegram, your numeric user id). Questions for you go to your conversation only. Empty: they go to the one person who writes to the agent; if several do, to nobody until you set it. |
 
 ## The `ygg` tool
 

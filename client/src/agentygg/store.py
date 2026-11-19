@@ -13,6 +13,7 @@ import base64
 import contextlib
 import json
 import os
+import re
 import secrets
 import threading
 import time
@@ -29,6 +30,38 @@ LEGACY_POINTER = ".ygg"
 
 def home() -> Path:
     return Path(os.environ.get("YGG_HOME") or Path.home() / ".ygg")
+
+
+# An agent id is a plain name, never a path (security audit YGG-35): it comes from pointers,
+# arguments and the gateway, and is joined into file names below.
+_AGENT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+
+
+def valid_id(agent_id: object) -> bool:
+    return isinstance(agent_id, str) and _AGENT_ID.fullmatch(agent_id) is not None
+
+
+def _checked(agent_id: str) -> str:
+    if not valid_id(agent_id):
+        raise LookupError(f"not an agent id: {agent_id!r}")
+    return agent_id
+
+
+def private_dir(d: Path) -> Path:
+    """Make `d` (under the client's folder) and that folder readable by this user only (0700),
+    whatever the umask (security audit YGG-37): tokens, message text and state live there.
+    POSIX only: on Windows the user profile's ACL protects them."""
+    d.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        root = home()
+        with contextlib.suppress(OSError):
+            os.chmod(root, 0o700)
+            rel = d.resolve().relative_to(root.resolve())
+            cur = root
+            for part in rel.parts:
+                cur = cur / part
+                os.chmod(cur, 0o700)
+    return d
 
 
 def agents_dir() -> Path:
@@ -155,7 +188,7 @@ def save(identity: Identity) -> Path:
     d.mkdir(parents=True, exist_ok=True)
     os.chmod(home(), 0o700)
     os.chmod(d, 0o700)
-    path = d / f"{identity.agent_id}.json"
+    path = d / f"{_checked(identity.agent_id)}.json"
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(identity.__dict__, indent=2))
     os.chmod(tmp, 0o600)
@@ -164,7 +197,7 @@ def save(identity: Identity) -> Path:
 
 
 def load(agent_id: str) -> Identity:
-    path = agents_dir() / f"{agent_id}.json"
+    path = agents_dir() / f"{_checked(agent_id)}.json"
     if not path.exists():
         raise LookupError(f"no agent @{agent_id} on this machine (connect it with: ygg connect)")
     data = json.loads(path.read_text())
@@ -178,6 +211,8 @@ def all_ids() -> list[str]:
 
 
 def remove(agent_id: str) -> bool:
+    if not valid_id(agent_id):
+        return False
     path = agents_dir() / f"{agent_id}.json"
     if path.exists():
         path.unlink()
@@ -219,14 +254,13 @@ _POKE_SEQ = 0
 
 
 def pokes_dir(agent_id: str) -> Path:
-    return state_dir() / "pokes" / agent_id
+    return state_dir() / "pokes" / _checked(agent_id)
 
 
 def write_poke(agent_id: str, text: str, topic: str = "", conversation: str = "") -> Path:
     """Leave a note for this agent's relay (or its live session): a job it started is done.
     Refused past POKES_MAX notes waiting, so a runaway script cannot pile them up."""
-    d = pokes_dir(agent_id)
-    d.mkdir(parents=True, exist_ok=True)
+    d = private_dir(pokes_dir(agent_id))
     if len(list(d.glob("*.json"))) >= POKES_MAX:
         raise RuntimeError(f"{POKES_MAX} notes already wait for @{agent_id}; not adding more")
     body = {"text": text[:4000], "topic": topic, "conversation": conversation, "ts": time.time()}
@@ -261,7 +295,7 @@ def has_pokes(agent_id: str) -> bool:
 
 
 def listen_path(agent_id: str) -> Path:
-    return state_dir() / f"{agent_id}.listen"
+    return state_dir() / f"{_checked(agent_id)}.listen"
 
 
 def read_listen(agent_id: str) -> dict | None:
@@ -275,7 +309,7 @@ def read_listen(agent_id: str) -> dict | None:
 def touch_listen(agent_id: str, nonce: str) -> None:
     """Mark this agent as listened to by a live session (the relay steps aside meanwhile)."""
     p = listen_path(agent_id)
-    p.parent.mkdir(parents=True, exist_ok=True)
+    private_dir(p.parent)
     tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")  # per process: two listeners never race
     tmp.write_text(json.dumps({"nonce": nonce, "pid": os.getpid(), "ts": time.time()}))
     tmp.replace(p)
@@ -290,13 +324,13 @@ def listener_active(agent_id: str, now: float | None = None) -> bool:
 
 
 def restart_path(agent_id: str) -> Path:
-    return state_dir() / f"{agent_id}.restart"
+    return state_dir() / f"{_checked(agent_id)}.restart"
 
 
 def request_restart(agent_id: str) -> None:
     """Ask this agent's relay to restart once its current turn is over (see Relay._worker)."""
     p = restart_path(agent_id)
-    p.parent.mkdir(parents=True, exist_ok=True)
+    private_dir(p.parent)
     p.write_text(str(time.time()))
 
 
@@ -348,7 +382,7 @@ def pointer_for(start: Path | None = None) -> tuple[str, Path] | None:
             f = d / LEGACY_POINTER  # skipped when it is the ~/.ygg store folder
         if f.is_file():
             agent_id = f.read_text().strip()
-            if agent_id:
+            if valid_id(agent_id):  # a path or garbage is no pointer (YGG-35)
                 return agent_id, d
     return None
 
@@ -391,7 +425,7 @@ def record_binding(directory: Path, agent_id: str) -> None:
     data = read_bindings()
     data[str(directory.resolve())] = agent_id
     p = bindings_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
+    private_dir(p.parent)
     tmp = p.with_name(f"bindings.{os.getpid()}.tmp")  # one per process: two writers never race
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
     tmp.replace(p)
@@ -411,10 +445,15 @@ def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
     """Which identity to act as: an explicit id, then `YGG_AGENT_ID`, then the directory's
     `.agentygg` pointer, then the only agent on this machine."""
     agent_id = agent_id or os.environ.get("YGG_AGENT_ID", "").strip() or None
+    untrusted = None
     if not agent_id:
-        found = pointer_for(start)
+        # Only a pointer this machine wrote (YGG-11): one that came with a cloned repository
+        # or sits in a shared parent folder never picks which agent speaks.
+        found = trusted_pointer(start)
         if found:
             agent_id = found[0]
+        else:
+            untrusted = pointer_for(start)
     if not agent_id:
         ids = all_ids()
         if len(ids) == 1:
@@ -423,8 +462,13 @@ def resolve(agent_id: str | None = None, start: Path | None = None) -> Identity:
             raise LookupError("no agent on this machine yet: run `ygg connect`")
         else:
             names = ", ".join(f"@{i}" for i in ids)
+            why = (
+                f"its .agentygg ({untrusted[1]}) was not written by this machine, so it is ignored"
+                if untrusted
+                else "this folder belongs to no agent"
+            )
             raise LookupError(
-                f"this folder belongs to no agent, and this machine has several ({names}). "
+                f"{why}, and this machine has several agents ({names}). "
                 "Connect this folder with `ygg connect` (sign in, then pick or create the "
                 f"agent), bind it to one of them with `ygg agent use <id>` (for example `ygg "
                 f"agent use {ids[0]}`, without the @), or pass --agent <id>"
