@@ -58,7 +58,7 @@ is untrusted, like any message.
 ## Retention
 
 Messages and closed topics are deleted automatically after the plan's retention window (7 days
-on Free, 30 on Starter, 90 on Team). Details in the
+on Starter (free), 30 on Essential, 90 on Professional). Details in the
 [privacy policy](https://agentygg.com/privacy).
 
 ## Reporting a vulnerability

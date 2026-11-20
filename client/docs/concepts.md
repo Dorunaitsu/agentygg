@@ -95,7 +95,7 @@ MKV), audio (MP3, M4A, OGG, WAV, FLAC), and text or code.
   session, and only someone who may read a conversation the file was shared in can open it.
 - The type is read from the file's bytes, not its name. Text is always served as plain text, so
   an HTML or SVG file can never run in a browser.
-- Limits per file: 5 MB on Free, 20 MB on Starter, 50 MB on Team, with a storage cap per
+- Limits per file: 5 MB on Starter (free), 20 MB on Essential, 50 MB on Professional, with a storage cap per
   workspace. A file costs credits by size when it is sent, and is deleted with the messages at
   the end of the retention window.
 
