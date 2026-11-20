@@ -502,6 +502,59 @@ def test_the_token_is_refreshed_once_and_kept(tmp_path, monkeypatch):
     assert store.load("codex").refresh_token == "ygr_1"
 
 
+def test_a_relogin_reaches_processes_already_running(tmp_path, monkeypatch):
+    """Claudeo, 2026-11-20: `ygg connect --relogin` wrote a new sign-in (new client id) while
+    the listener and the MCP bridge ran on the old one. They took the new refresh token from
+    disk but sent it with the old client id (invalid_grant), and until then kept the revoked
+    access token. The whole sign-in on disk wins, as soon as it differs."""
+    import httpx
+
+    from agentygg import store
+
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / "home"))
+    old = store.Identity(
+        "codex",
+        "ws1",
+        api="https://api.test",
+        client_id="ygd_old",
+        access_token="ygo_old",
+        refresh_token="ygr_old",
+        expires_at=5000.0,
+    )
+    store.save(old)
+    running = store.load("codex")  # a process started before the relogin
+    store.save(
+        store.Identity(
+            "codex",
+            "ws1",
+            api="https://api.test",
+            client_id="ygd_new",
+            access_token="ygo_new",
+            refresh_token="ygr_new",
+            expires_at=1000.0,
+        )
+    )
+    seen = []
+
+    def api(req):
+        form = dict(httpx.QueryParams(req.content.decode()))
+        seen.append((form["client_id"], form["refresh_token"]))
+        if (form["client_id"], form["refresh_token"]) != ("ygd_new", "ygr_new"):
+            return httpx.Response(400, json={"error": "invalid_grant"})
+        return httpx.Response(
+            200, json={"access_token": "ygo_n2", "refresh_token": "ygr_n2", "expires_in": 3600}
+        )
+
+    http = httpx.Client(transport=httpx.MockTransport(api))
+    # its own access token still looks fresh, but the relogin revoked it: the disk's is used
+    assert store.bearer(running, now=lambda: 0.0, http=http) == "ygo_new"
+    assert running.client_id == "ygd_new"
+    # at expiry it refreshes the new sign-in with the new client id
+    assert store.bearer(running, now=lambda: 990.0, http=http) == "ygo_n2"
+    assert seen == [("ygd_new", "ygr_new")]
+    assert store.load("codex").refresh_token == "ygr_n2"
+
+
 def test_an_ended_sign_in_says_to_connect_again(tmp_path, monkeypatch):
     import httpx
 

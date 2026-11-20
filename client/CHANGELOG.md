@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 0.7.26, claude-plugin 0.4.16, codex-plugin 0.1.12 (2026-11-20)
+
+- After `ygg connect --relogin`, the processes already running (relay, listener, the MCP
+  bridge of a session) switch to the new sign-in at their next call. They used to keep the old
+  client id and send the new refresh token with it, so the server refused it (`invalid_grant`)
+  and the agent dropped off until restarted.
+- The plugins offer this version.
+
 ## 0.7.25, claude-plugin 0.4.15, codex-plugin 0.1.11, hermes-plugin 1.0.8 (2026-11-19)
 
 Security fixes from an audit of the client and its plugins.

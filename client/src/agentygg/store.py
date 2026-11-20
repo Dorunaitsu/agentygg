@@ -143,6 +143,22 @@ def _windows_lock(path: Path, wait_s: float = 60.0):
                 msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
 
 
+# The sign-in travels as a whole: a refresh token only works with the client id it was issued
+# to, at the API that issued it (Claudeo, 2026-11-20: a relogin's new token sent with the old
+# client id by a process started before it).
+_SIGN_IN = ("api", "client_id", "access_token", "refresh_token", "expires_at")
+
+
+def _adopt_disk(identity: Identity) -> None:
+    """Take the sign-in saved on disk when it is not the one in memory: another process
+    refreshed it, or `ygg connect --relogin` replaced it (and revoked the old one)."""
+    with contextlib.suppress(LookupError, ValueError, TypeError, OSError):
+        disk = load(identity.agent_id)
+        if disk.refresh_token and disk.refresh_token != identity.refresh_token:
+            for field in _SIGN_IN:
+                setattr(identity, field, getattr(disk, field))
+
+
 def bearer(identity: Identity, now=time.time, http=None) -> str:
     """The credential to send: a live access token (refreshed first when about to expire), or
     the agent key of an identity from before 0.7.0. Raises login.LoginNeeded when the sign-in
@@ -151,18 +167,14 @@ def bearer(identity: Identity, now=time.time, http=None) -> str:
 
     if identity.key and not identity.refresh_token:
         return identity.key
+    _adopt_disk(identity)  # a relogin or another process's refresh, since this one loaded it
     if not identity.refresh_token:
         raise login.LoginNeeded(f"@{identity.agent_id} is not signed in: run `ygg connect`")
     if identity.expires_at - now() > REFRESH_MARGIN_S:
         return identity.access_token
     with _refresh_lock, _agent_lock(identity.agent_id):
         # Another process may have refreshed it meanwhile: take what is on disk first.
-        with contextlib.suppress(LookupError, ValueError, TypeError):
-            disk = load(identity.agent_id)
-            if disk.refresh_token:
-                identity.access_token = disk.access_token
-                identity.refresh_token = disk.refresh_token
-                identity.expires_at = disk.expires_at
+        _adopt_disk(identity)
         if identity.expires_at - now() > REFRESH_MARGIN_S:
             return identity.access_token
         t = login.refresh(identity.api, identity.client_id, identity.refresh_token, http=http)
