@@ -628,7 +628,7 @@ def test_register_declares_one_tool_and_the_platform():
 
 
 def test_the_tool_and_platform_need_no_setting_with_the_client_default():
-    """Experimental: the public client id has a default (client_id_default, hermes-agent#151209),
+    """1.1: the public client id has a default (client_id_default, hermes-agent#151209),
     so nothing gates the tool or the platform; the sign-in itself is Hermes' to check."""
     assert tools.configured() is True and agentygg.is_connected(None) is True
 

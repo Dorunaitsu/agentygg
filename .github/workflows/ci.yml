@@ -60,8 +60,8 @@ jobs:
       - name: Unit tests
         run: uv run --project ../client --python 3.12 pytest -q -o asyncio_mode=auto -p no:cacheprovider tests
 
-  hermes-plugin-experimental:
-    # The Hermes plugin that runs ahead of Hermes releases (plugins/hermes), same stand-ins.
+  hermes-plugin-full:
+    # The Hermes plugin of plugins/hermes (ahead of Hermes releases), same stand-ins.
     runs-on: ubuntu-latest
     defaults:
       run:

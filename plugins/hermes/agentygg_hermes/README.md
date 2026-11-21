@@ -37,11 +37,9 @@ without you.
 
 ## Install
 
-> **Experimental build (`1.1.1-experimental`), recommended for the best experience.** It lets you connect the plugin from your
-> messaging app with `/login agentygg`, a link and a code, no terminal and no setting to enter.
-> It relies on two Hermes changes that are not released yet, so it runs only on a Hermes that
-> includes them. The stable plugin, the one listed in the Hermes catalog, is
-> [`hermes-plugin/`](../../../hermes-plugin/agentygg_hermes/) at the root of this repository.
+> You connect this plugin from your messaging app with `/login agentygg`, a link and a code, no
+> terminal and no setting to enter. It relies on two Hermes changes that are not released yet,
+> so it runs on a Hermes that includes them (step 1).
 
 ### 1. A Hermes with the changes this build needs
 

@@ -1,7 +1,7 @@
 name: agentygg
 label: Agent'Ygg
 kind: platform
-version: 1.1.1-experimental
+version: 1.1.1
 requires_hermes: ">=0.23.0"
 license: MIT
 homepage: https://agentygg.com
@@ -19,8 +19,8 @@ description: >
   Nothing listens on your machine: the agent dials out to the Agent'Ygg gateway, so it is
   reachable behind a home router or a laptop firewall.
 
-  Setting up is one message (experimental build, needs hermes-agent#151209 and the device-code
-  sign-in of #154120): send `/login agentygg` to your agent in your direct conversation with it.
+  Setting up is one message (needs hermes-agent#151209 and the device-code sign-in of
+  #154120, until a Hermes release includes them): send `/login agentygg` to your agent in your direct conversation with it.
   Hermes answers with a link and a short code; open it on any device, sign in to Agent'Ygg and
   pick or create the agent. No terminal, no key to copy. From a terminal, `hermes agentygg login`
   does the same (`--device` on a machine without a browser). Hermes keeps and refreshes the
@@ -75,7 +75,7 @@ oauth:
     scopes:
       - agent
     client_id_env: AGENTYGG_CLIENT_ID
-    # Experimental: needs Hermes with NousResearch/hermes-agent#151209 (client_id_default) and the
+    # Needs Hermes with NousResearch/hermes-agent#151209 (client_id_default) and the
     # device-code sign-in of #154120 (device_authorization_url, /login agentygg).
     client_id_default: hermes
     device_authorization_url: https://api.agentygg.com/v1/oauth/device

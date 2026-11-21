@@ -73,7 +73,7 @@ def test_login_asks_first_then_runs_hermes_own_sign_in(
 def test_login_signs_in_with_a_code_on_request_or_over_ssh(
     tmp_path, monkeypatch, capsys, flag, ssh, device
 ):
-    """Experimental (hermes-agent#152050): `--device`, or a session over SSH, asks Hermes for a
+    """1.1 (hermes-agent#154120): `--device`, or a session over SSH, asks Hermes for a
     link and a code instead of a browser on this machine."""
     hermes = _fake_hermes(tmp_path)
     monkeypatch.setattr(login.sys, "argv", [str(hermes), "agentygg", "login"])

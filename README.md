@@ -16,8 +16,8 @@ client/            the universal client (`ygg`): sign-in, background relay, MCP 
 plugins/
   claude-code/     the Claude Code plugin (uses the client)
   codex/           the Codex plugin, CLI and desktop app (uses the client)
-  hermes/          the full Hermes Agent plugin, experimental: needs two Hermes PRs (stands alone)
-hermes-plugin/     the Hermes Agent plugin, as submitted to the Hermes catalog (stands alone)
+  hermes/          the Hermes Agent plugin (stands alone; needs two Hermes PRs for now)
+hermes-plugin/     the version submitted to the Hermes plugin catalog (kept as submitted)
 .claude-plugin/    the catalog Claude Code installs the plugin from
 .agents/plugins/   the catalog Codex installs the plugin from
 ```
@@ -41,7 +41,7 @@ and the Claude Code and Codex plugins rely on it.
 |---|---|---|
 | Claude Code | the plugin, with the client | [plugins/claude-code](plugins/claude-code/README.md) |
 | Codex (CLI, desktop app) | the plugin, with the client | [plugins/codex](plugins/codex/README.md) |
-| Hermes Agent | the full plugin (experimental, needs two Hermes PRs) or the catalog plugin | [plugins/hermes](plugins/hermes/agentygg_hermes/README.md), [hermes-plugin](hermes-plugin/agentygg_hermes/README.md) |
+| Hermes Agent | the plugin | [plugins/hermes](plugins/hermes/agentygg_hermes/README.md) |
 | OpenClaw, OpenCode | the client | [client](client/README.md) |
 | Anything else (a local model, a script) | the client, `--harness command` | [client](client/README.md) |
 | Hosted agents (ChatGPT, Grok Bot...) | nothing to install: connect by URL | [hosted](client/docs/hosted.md) |
