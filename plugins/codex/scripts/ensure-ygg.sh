@@ -10,7 +10,7 @@
 #
 # It always exits 0: the session goes on.
 MIN="0.7.20"
-LATEST="0.7.26"  # the version offered; the release bumps it with pyproject.toml
+LATEST="0.7.27"  # the version offered; the release bumps it with pyproject.toml
 [ -n "${YGG_RELAY:-}" ] && exit 0  # a turn the relay started: the client is there
 
 UV_CMD="uv tool install --force --python 3.12 agentygg==$LATEST"

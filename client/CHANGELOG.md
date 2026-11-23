@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 0.7.27, claude-plugin 0.4.17, codex-plugin 0.1.13 (2026-11-23)
+
+- The sign-in link of `ygg connect` and `ygg login` opens in the browser by itself when the
+  command runs on your own machine (macOS, Windows, Linux with a display; never over SSH).
+  `--no-browser` (or `YGG_NO_BROWSER=1`) keeps it closed.
+- In a terminal, the link is a real hyperlink: one Cmd or Ctrl+click opens it, even when the
+  window wraps it. It sits on a line of its own, with the code to check under it.
+- The plugins offer this version.
+
 ## 0.7.26, claude-plugin 0.4.16, codex-plugin 0.1.12 (2026-11-20)
 
 - After `ygg connect --relogin`, the processes already running (relay, listener, the MCP

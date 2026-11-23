@@ -169,7 +169,7 @@ def cmd_agent_run(args) -> None:
 # -- connect: everything in one command --------------------------------------- #
 
 
-def _sign_in(api: str, root: Path | None, label: str = "") -> store.Identity:
+def _sign_in(api: str, root: Path | None, label: str = "", browser: bool = True) -> store.Identity:
     """The device login (login.py): a link and a code the person approves on any device, where
     they pick or create the agent. Stores the identity (0600) and, with `root`, binds that
     folder to it."""
@@ -177,7 +177,7 @@ def _sign_in(api: str, root: Path | None, label: str = "") -> store.Identity:
 
     name = login.device_name(label)
     try:
-        t = login.device_login(api, client_name=name)
+        t = login.device_login(api, client_name=name, browser=browser)
     except KeyboardInterrupt:
         _fail("cancelled")
     except (httpx.HTTPError, OSError) as e:
@@ -224,7 +224,12 @@ def cmd_login(args) -> None:
     from agentygg import detect, harnesses
 
     kind, _how = detect.detect()
-    _sign_in(args.api, Path.cwd() if args.here else None, harnesses.LABELS.get(kind or "", ""))
+    _sign_in(
+        args.api,
+        Path.cwd() if args.here else None,
+        harnesses.LABELS.get(kind or "", ""),
+        browser=not getattr(args, "no_browser", False),
+    )
 
 
 def cmd_connect(args) -> None:
@@ -276,7 +281,12 @@ def cmd_connect(args) -> None:
         except LookupError:
             ident = None
     if ident is None:
-        ident = _sign_in(args.api, root, harnesses.LABELS.get(kind, kind.capitalize()))
+        ident = _sign_in(
+            args.api,
+            root,
+            harnesses.LABELS.get(kind, kind.capitalize()),
+            browser=not getattr(args, "no_browser", False),
+        )
 
     # 3. Wire it (MCP server + skill), 4. start the relay.
     if kind != "command":
@@ -400,7 +410,7 @@ def cmd_relay_poke(args) -> None:
     agent_id = _relay_target(args)
     text = args.text if args.text != "-" else sys.stdin.read()
     if not text.strip():
-        _fail("say what happened: --text \"...\" (or --text - to read it from stdin)")
+        _fail('say what happened: --text "..." (or --text - to read it from stdin)')
     try:
         store.write_poke(agent_id, text.strip(), args.topic or "", args.conversation or "")
     except RuntimeError as e:
@@ -976,6 +986,9 @@ def build_parser() -> argparse.ArgumentParser:
     _harness_opts(a)
     a.add_argument("--no-relay", action="store_true", help="wire the harness, do not start a relay")
     a.add_argument(
+        "--no-browser", action="store_true", help="show the sign-in link without opening it"
+    )
+    a.add_argument(
         "--plugin",
         action="store_true",
         help="Claude Code with the agentygg plugin: bind the folder and start the relay, but leave "
@@ -990,6 +1003,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     a.add_argument("--api", default=os.environ.get("YGG_API", store.DEFAULT_API))
     a.add_argument("--here", action="store_true", help="also bind this directory to the agent")
+    a.add_argument(
+        "--no-browser", action="store_true", help="show the sign-in link without opening it"
+    )
     a.set_defaults(fn=cmd_login)
 
     rl = sub.add_parser("relay", help="relays as background services (login, reboot, crash)")

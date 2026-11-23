@@ -12,6 +12,7 @@ The tokens open the agent gateway as that agent only, and die with it (revoked, 
 
 from __future__ import annotations
 
+import os
 import socket
 import sys
 import time
@@ -54,6 +55,33 @@ def qr_lines(url: str) -> list[str]:
     ]
 
 
+def hyperlink(url: str) -> str:
+    """The link as a terminal hyperlink (OSC 8): one Cmd/Ctrl+click opens it even when the
+    window wraps it, in iTerm, Terminal, VS Code and the others that support it; the rest show
+    the plain text (Ray, 2026-11-23: the link was not clickable)."""
+    return f"\033]8;;{url}\033\\{url}\033]8;;\033\\"
+
+
+def open_browser(url: str) -> bool:
+    """Open the sign-in page in this machine's browser, when this machine has a screen in
+    front of someone: macOS or Windows, or Linux with a display, and never over SSH (it would
+    open on a screen nobody looks at). Only Agent'Ygg's own https links. False if not opened."""
+    if not url.startswith("https://") or os.environ.get("YGG_NO_BROWSER"):
+        return False
+    if os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_TTY"):
+        return False
+    if sys.platform not in ("darwin", "win32") and not (
+        os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+    ):
+        return False
+    try:
+        import webbrowser
+
+        return bool(webbrowser.open(url, new=2))
+    except Exception:  # noqa: BLE001 - a browser that fails to start leaves the link
+        return False
+
+
 def _say(line: str) -> None:
     """Print at once: an agent that runs the login in the background must see the link
     while the command waits (stdout to a pipe is buffered otherwise; found 2026-11-08)."""
@@ -80,6 +108,7 @@ def device_login(
     client_name: str = "",
     out: Callable[[str], None] = None,  # default: print, flushed
     http: httpx.Client | None = None,
+    browser: bool = False,  # also open the page in this machine's browser (ygg connect does)
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], float] = time.time,
 ) -> dict:
@@ -97,9 +126,14 @@ def device_login(
             raise LoginNeeded(f"Agent'Ygg could not start the sign-in ({r.status_code})")
         d = r.json()
         out("")
+        url = d["verification_uri_complete"]
         out("To connect this agent to Agent'Ygg, open this link on any device:")
-        out(f"    {d['verification_uri_complete']}")
-        out(f"and check that it shows the code  {d['user_code']}")
+        out("")
+        out(hyperlink(url) if sys.stdout.isatty() else url)
+        out("")
+        out(f"It should show the code {d['user_code']}: allow only if it does.")
+        if browser and open_browser(url):
+            out("(Opened in your browser on this machine.)")
         if sys.stdout.isatty():  # someone is at the terminal: let them scan it with their phone
             out("")
             for line in qr_lines(d["verification_uri_complete"]):

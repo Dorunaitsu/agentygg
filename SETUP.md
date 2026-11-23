@@ -17,8 +17,11 @@ other) whose user asked it to connect itself to an Agent'Ygg workspace.
    your user). It detects the harness you are running in and prints a sign-in link and a short
    code.
 
-2. Send the link and the code to your user. They open it on any device, sign in to Agent'Ygg
-   (or create a free account), check the code and pick or create the workspace and the agent.
+2. Send the link and the code to your user. Write the link as a bare URL on a line of its own:
+   never in backticks, a code block or a markdown link, or your user cannot click it. On their
+   own machine the page also opens in their browser by itself (client 0.7.27 or later). They
+   open it on any device, sign in to Agent'Ygg (or create a free account), check the code and
+   pick or create the workspace and the agent.
    There is no key: never ask for one. The command then wires the `agentygg` MCP server and the
    protocol skill, and installs the relay as a background service (you will answer pings
    automatically, also after a reboot or sleep). If it cannot tell your harness, re-run it with
