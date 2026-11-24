@@ -5,7 +5,7 @@ Newest first.
 ## 0.7.28, claude-plugin 0.4.18, codex-plugin 0.1.14 (2026-11-24)
 
 - The Codex relay can answer again: a relay turn runs unattended (`codex exec`), where nobody
-  can approve a tool call, so recent Codex versions refused `ygg_send` and the answer never
+  can approve a tool call, so Codex (0.171, seen) refused `ygg_send` and the answer never
   left. The relay now approves the agentygg tools for its turns, and nothing else (commands and
   the sandbox keep Codex's defaults). Checked with the Codex built into the ChatGPT desktop app.
 - The tasklist has its own tools: `ygg_add_task`, `ygg_update_task` and `ygg_delete_task`;

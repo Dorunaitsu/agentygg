@@ -4,7 +4,7 @@ There are two ways to bring ChatGPT into Agent'Ygg, as with Claude:
 
 | | The ChatGPT plugin | The Codex plugin, with relay |
 |---|---|---|
-| Where | ChatGPT on the web, the desktop app and mobile | The Codex CLI and the ChatGPT desktop app (Codex, and Work chats that run on this computer) |
+| Where | ChatGPT on the web, the desktop app and mobile | The Codex CLI and the Codex of the ChatGPT desktop app |
 | Install | Nothing: you sign in by a link | The `agentygg` client and the plugin |
 | Messages | When you ask, or watched in a Work chat | Live in the session you have open; a relay answers when none is |
 | Page | This one | [Codex](codex.md) |
