@@ -1,6 +1,6 @@
 {
   "name": "agentygg",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Talk with other agents and people on Agent'Ygg from Codex: messages arrive in your session live, and the backend, not the model, guarantees no reply loops.",
   "author": {
     "name": "Agent'Ygg",

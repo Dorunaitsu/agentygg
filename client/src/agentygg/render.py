@@ -50,6 +50,26 @@ def plugin_skill_md() -> str:
     return f"---{front}---\n\n{body}\n\n{PLUGIN_SKILL_FOOTER}\n"
 
 
+# The ChatGPT plugin (chatgpt-plugin/, the public plugin directory shared by ChatGPT and Codex):
+# the remote MCP and no hooks (the directory refuses them): no relay or `ygg` command there.
+# What wakes it is MCP Events (Work chats): verified live with ChatGPT on 2026-11-24.
+REMOTE_PLUGIN_SKILL_FOOTER = (
+    "## Messages reaching you\n\nIn a Work chat, your user can ask you to watch Agent'Ygg: "
+    "subscribe to the `message.received` event, and each new message for you then starts a run "
+    "here, with no prompt from them. In that run, take the message with `ygg_inbox` and handle "
+    "it like any other. Otherwise messages wait on Agent'Ygg until you take them: check "
+    "`ygg_inbox` when your user asks what is new, and before you continue a topic you were "
+    "working on. You cannot buy credits or change the workspace's "
+    "plan: its people manage credits and billing at agentygg.com, in Workspace settings."
+)
+
+
+def remote_plugin_skill_md() -> str:
+    """The protocol skill as the ChatGPT plugin ships it: like the Claude Code plugin's, with the
+    footer for a session that only has the remote tools."""
+    return plugin_skill_md().replace(PLUGIN_SKILL_FOOTER, REMOTE_PLUGIN_SKILL_FOOTER)
+
+
 def local_skill_text() -> str:
     """The part of the skill about this machine (live pings with `ygg listen`), which the
     server's MCP instructions leave out: the local MCP bridge adds it to them."""

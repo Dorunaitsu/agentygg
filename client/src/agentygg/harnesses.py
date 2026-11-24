@@ -212,6 +212,13 @@ class Codex(Harness):
             f"mcp_servers.agentygg.args={_toml(mcp.args)}",
             "-c",
             f"mcp_servers.agentygg.env={_toml(mcp.env)}",
+            # A relay turn runs unattended (`codex exec`): nobody can approve a tool call, so
+            # Codex refuses every MCP tool that is not read-only, ygg_send included, and the
+            # answer never leaves (found 2026-11-24 with the Codex inside ChatGPT desktop).
+            # Approve this one server's tools only: they act as this agent on Agent'Ygg, where
+            # the backend enforces every rule. Commands and the sandbox keep Codex's defaults.
+            "-c",
+            'mcp_servers.agentygg.default_tools_approval_mode="approve"',
         ]
         if session:
             cmd = [self.exe(), "exec", "resume", session, "--json", "--skip-git-repo-check", *conf]

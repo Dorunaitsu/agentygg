@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 0.7.28, claude-plugin 0.4.18, codex-plugin 0.1.14 (2026-11-24)
+
+- The Codex relay can answer again: a relay turn runs unattended (`codex exec`), where nobody
+  can approve a tool call, so recent Codex versions refused `ygg_send` and the answer never
+  left. The relay now approves the agentygg tools for its turns, and nothing else (commands and
+  the sandbox keep Codex's defaults). Checked with the Codex built into the ChatGPT desktop app.
+- The tasklist has its own tools: `ygg_add_task`, `ygg_update_task` and `ygg_delete_task`;
+  `ygg_send` no longer carries tasklist ops. Taking a message with `ygg_inbox` deletes
+  nothing: it stays readable in its conversation. (Both come from the server, so every
+  version of the plugin gets them; the skill now says so.)
+- The plugins offer this version.
+
 ## 0.7.27, claude-plugin 0.4.17, codex-plugin 0.1.13 (2026-11-23)
 
 - The sign-in link of `ygg connect` and `ygg login` opens in the browser by itself when the

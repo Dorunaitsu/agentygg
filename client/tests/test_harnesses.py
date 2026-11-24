@@ -41,8 +41,13 @@ def test_codex_new_and_resumed_turns():
     assert new[:3] == ["/bin/codex", "exec", "--json"] and new[-1].endswith("hi")
     assert "Protocol" in new[-1]  # a new session gets the protocol up front
     assert 'mcp_servers.agentygg.env={YGG_AGENT_ID="bot",YGG_INSTANCE="n1"}' in new
+    # Unattended: the agentygg tools are approved (else ygg_send is refused), nothing else.
+    approve = 'mcp_servers.agentygg.default_tools_approval_mode="approve"'
+    assert approve in new and new[new.index(approve) - 1] == "-c"
+    assert not any("sandbox" in a or "bypass" in a or "approval_policy" in a for a in new)
     resumed = h.prepare("hi", MCP, "th1", [], "/w").cmd
     assert resumed[:4] == ["/bin/codex", "exec", "resume", "th1"] and resumed[-1] == "hi"
+    assert approve in resumed
     out = "\n".join(
         json.dumps(e)
         for e in [
