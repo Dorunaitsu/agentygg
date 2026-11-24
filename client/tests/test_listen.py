@@ -34,7 +34,7 @@ class FakeGw:
         self.replies = list(replies)
         self.waits = []
 
-    async def inbox(self, wait=0.0):
+    async def inbox(self, wait=0.0, ack=None):
         self.waits.append(wait)
         r = self.replies.pop(0) if self.replies else {"wakes": [], "mailbox": []}
         if isinstance(r, Exception):
@@ -438,7 +438,7 @@ def test_a_live_session_gets_the_local_notes(home):
     store.write_poke("bot", "render done")
     seen = []
 
-    async def fake_listen(gw_, out, alive=None):
+    async def fake_listen(gw_, out, alive=None, **_kw):
         return lst.STOPPED
 
     async def go():
@@ -488,7 +488,7 @@ def test_a_listener_that_cannot_reach_the_gateway_stops_claiming_the_agent(home,
         identity = store.Identity("bot", "lab", "yga_x")
         nonce = "n1"
 
-        async def inbox(self, wait=0.0):
+        async def inbox(self, wait=0.0, ack=None):
             clock[0] += 30.0  # each failed try takes time
             raise _httpx.ConnectError("certificate file gone")
 
@@ -527,9 +527,137 @@ def test_a_listener_that_reaches_the_gateway_keeps_claiming(home, monkeypatch):
         identity = store.Identity("bot", "lab", "yga_x")
         nonce = "n1"
 
-        async def inbox(self, wait=0.0):
+        async def inbox(self, wait=0.0, ack=None):
             return {"wakes": [ping], "mailbox": []}
 
     out = []
     assert asyncio.run(lst.listen(Up(), out=out.append)) == lst.GOT_MESSAGE
     assert store.listener_active("bot")
+
+
+# -- what a poll hands over is confirmed once delivered (2026-11-24) -------------------------- #
+
+
+class AckGw(FakeGw):
+    def __init__(self, replies, confirm=()):
+        super().__init__(replies)
+        self.acks, self.confirmed, self.confirm_replies = [], [], list(confirm)
+
+    async def inbox(self, wait=0.0, ack=None):
+        self.acks.append(ack)
+        return await super().inbox(wait)
+
+    async def confirm(self, batch):
+        self.confirmed.append(batch)
+        r = self.confirm_replies.pop(0) if self.confirm_replies else {"confirmed": True}
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+def _batch(text="hi", batch="b1"):
+    env = {"id": "m1", "type": "request", "from": "a", "payload": {"text": text}}
+    return {"wakes": [{"kind": "wake", "envelope": env}], "mailbox": [], "batch": batch}
+
+
+def _listen(gw, monkeypatch, tmp_path):
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / ".ygg"))
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(lst.asyncio, "sleep", no_sleep)
+    out = []
+    return asyncio.run(lst.listen(gw, out=out.append)), out
+
+
+def test_a_batch_is_confirmed_once_it_is_printed(monkeypatch, tmp_path):
+    gw = AckGw([_batch()])
+    code, out = _listen(gw, monkeypatch, tmp_path)
+    assert code == lst.GOT_MESSAGE and len(out) == 1
+    assert gw.acks == [""] and gw.confirmed == ["b1"]
+
+
+def test_a_batch_that_could_not_be_printed_is_not_confirmed(monkeypatch, tmp_path):
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / ".ygg"))
+    gw = AckGw([_batch()])
+
+    def broken(_):
+        raise BrokenPipeError
+
+    with pytest.raises(BrokenPipeError):
+        asyncio.run(lst.listen(gw, out=broken))
+    assert gw.confirmed == []
+
+
+def _follow(gw, monkeypatch, tmp_path, alive_for, **kw):
+    """Follow until `alive` has been asked `alive_for` times."""
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / ".ygg"))
+    asked, out = [0], []
+
+    def alive():
+        asked[0] += 1
+        return asked[0] <= alive_for
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(lst.asyncio, "sleep", no_sleep)
+    asyncio.run(lst.follow(gw, out=out.append, alive=alive, sleep=no_sleep, **kw))
+    return out
+
+
+def test_a_session_gets_its_delivery_before_it_is_confirmed(monkeypatch, tmp_path):
+    gw = AckGw([_batch()])
+    seen = []
+    gw_confirm = gw.confirm
+
+    async def confirm(batch):
+        seen.append(len(out_ref))
+        return await gw_confirm(batch)
+
+    gw.confirm, out_ref = confirm, []
+    monkeypatch.setenv("YGG_HOME", str(tmp_path / ".ygg"))
+    left = [6]
+
+    def alive():
+        left[0] -= 1
+        return left[0] > 0
+
+    async def no_sleep(_):
+        return None
+
+    asyncio.run(lst.follow(gw, out=out_ref.append, alive=alive, sleep=no_sleep))
+    assert gw.confirmed == ["b1"] and seen == [1]
+
+
+def test_a_session_that_ends_right_after_a_delivery_does_not_confirm_it(monkeypatch, tmp_path):
+    """Codex takes a message for a session that is closing (its own queue): nobody reads it, so
+    the relay must get it (seen live, 2026-11-24)."""
+    gw = AckGw([_batch()])
+    out = _follow(gw, monkeypatch, tmp_path, alive_for=2, settle_s=3.0)
+    assert len(out) == 1 and gw.confirmed == []
+
+
+def test_a_confirmation_that_fails_is_tried_again_and_never_costs_the_message(
+    monkeypatch, tmp_path
+):
+    import httpx as _httpx
+
+    gw = AckGw([_batch()], confirm=[_httpx.ConnectError("down")] * 9)
+    code, out = _listen(gw, monkeypatch, tmp_path)
+    assert code == lst.GOT_MESSAGE and len(out) == 1 and 2 <= len(gw.confirmed) <= 4
+
+
+def test_a_server_without_confirmation_is_asked_once(monkeypatch, tmp_path):
+    gw = AckGw([_batch()], confirm=[lst.GatewayError(404, "Not Found")] * 9)
+    code, out = _listen(gw, monkeypatch, tmp_path)
+    assert code == lst.GOT_MESSAGE and len(out) == 1 and len(gw.confirmed) == 1
+
+
+def test_a_server_that_gives_no_batch_is_not_asked(monkeypatch, tmp_path):
+    reply = _batch()
+    del reply["batch"]
+    gw = AckGw([reply])
+    code, _ = _listen(gw, monkeypatch, tmp_path)
+    assert code == lst.GOT_MESSAGE and gw.confirmed == []

@@ -74,6 +74,20 @@ def _meanwhile(agent_id: str) -> str:
     )
 
 
+async def _confirm(gw: Gateway, batch: str) -> None:
+    """Tell the server the batch is delivered, so it neither keeps it nor gives it to the relay. A
+    few quick tries; failing costs at most a second delivery, never the message."""
+    for pause in (0.0, 0.5, 2.0):
+        await asyncio.sleep(pause)
+        try:
+            await gw.confirm(batch)
+            return
+        except GatewayError:
+            return  # an older server (404), or it refuses us: the next poll says why
+        except (httpx.HTTPError, OSError):
+            continue
+
+
 async def listen(
     gw: Gateway,
     *,
@@ -83,9 +97,14 @@ async def listen(
     retry_cap: float = 30.0,
     busy_grace: float = 75.0,
     alive: Callable[[], bool] | None = None,
+    ack: str = "",
+    taken: list[str] | None = None,
 ) -> int:
+    """`ack`: the batch to confirm with the first poll. `taken`: the caller delivers and confirms
+    itself (follow); the batch to confirm goes there instead of being confirmed here."""
     agent_id = gw.identity.agent_id
     held: list[dict] = []
+    batch = ack  # the last one taken: the next poll confirms it
     deadline = time.monotonic() + timeout if timeout > 0 else None
     backoff = 2.0
     busy_since: float | None = None
@@ -112,7 +131,8 @@ async def listen(
                 break
             wait = min(wait, left)
         try:
-            got = await gw.inbox(wait=wait)
+            got = await gw.inbox(wait=wait, ack=batch)
+            batch = got.get("batch") or ""
             backoff = 2.0
             busy_since = None
             _LAST_OK[agent_id] = time.monotonic()
@@ -142,6 +162,11 @@ async def listen(
         if any(include_system or not is_system(f) for f in frames):
             for f in held:
                 out(render_message(f))
+            # Delivered first, confirmed after: a delivery that fails is handed over again.
+            if taken is not None:
+                taken.append(batch)
+            elif batch:
+                await _confirm(gw, batch)
             return GOT_MESSAGE
     for f in held:
         out(render_message(f))
@@ -234,15 +259,18 @@ async def follow(
     alive: Callable[[], bool] | None = None,
     sleep: Callable[[float], object] = asyncio.sleep,
     shape: Callable[[list[str]], str] = fit_delivery,
+    settle_s: float = 0.0,
 ) -> int:
     """Listen for the whole session: each message is printed as it arrives (one block per
     delivery, its system notices with it), and listening goes on. Nothing is printed while
     waiting, and a refusal (revoked, signed out, another instance busy) is retried every
     `retry_s`, told to the session once if it lasts, so the monitor never wakes the model for a
-    hiccup. `shape` makes one delivery of the messages (a monitor's cut to fit, by default).
+    hiccup. A delivery is confirmed to the server once the session outlived it by `settle_s`: one
+    made to a session that is closing is the relay's to answer. `shape` makes one delivery of the messages (a monitor's cut to fit, by default).
     Returns only when `alive` says the session is gone."""
     refused = 0
     reported: str | None = None
+    batch = ""
     while True:
         if alive is not None and not alive():
             store.clear_listen(gw.identity.agent_id)
@@ -255,11 +283,19 @@ async def follow(
 
             out(shape([render_poke(n) for n in notes]))
         lines: list[str] = []
-        code = await listen(gw, out=lines.append, alive=alive)
+        taken: list[str] = []
+        code = await listen(gw, out=lines.append, alive=alive, ack=batch, taken=taken)
+        batch = taken[-1] if taken else ""
         stop = code == STOPPED and bool(lines) and lines[-1].startswith(STOP_PREFIX)
         messages = lines[:-1] if stop else lines
         if messages:
             out(shape(messages))
+        if batch:
+            await sleep(settle_s)
+            if alive is not None and not alive():
+                store.clear_listen(gw.identity.agent_id)
+                return STOPPED
+            await _confirm(gw, batch)
         if code != STOPPED:
             refused, reported = 0, None
             continue

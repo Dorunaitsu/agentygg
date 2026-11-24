@@ -10,10 +10,11 @@
 #
 # It always exits 0: the session goes on.
 MIN="0.7.20"
-LATEST="0.7.28"  # the version offered; the release bumps it with pyproject.toml
+# No client version here: Codex hashes every file of the plugin, and any change makes it ask its
+# user to trust the hooks again (live messages stop until then). PyPI gives the latest.
 [ -n "${YGG_RELAY:-}" ] && exit 0  # a turn the relay started: the client is there
 
-UV_CMD="uv tool install --force --python 3.12 agentygg==$LATEST"
+UV_CMD="uv tool install --force --python 3.12 agentygg"
 case "$(uname -s 2>/dev/null)" in
   Darwin|Linux) SCRIPT="curl -fsSL https://agentygg.com/install.sh | sh" ;;
   *) SCRIPT="irm https://agentygg.com/install.ps1 | iex   (in PowerShell)" ;;
@@ -21,13 +22,13 @@ esac
 
 have() { command -v "$1" >/dev/null 2>&1; }
 if have uv || [ -x "$HOME/.local/bin/uv" ]; then
-  PLAN="uv is already here, so it is one command that installs agentygg $LATEST from PyPI: $UV_CMD ."
+  PLAN="uv is already here, so it is one command that installs agentygg from PyPI: $UV_CMD ."
 elif have pipx; then
-  PLAN="pipx is already here, so it is one command that installs agentygg $LATEST from PyPI (it needs Python 3.12 or later): pipx install --force agentygg==$LATEST ."
+  PLAN="pipx is already here, so it is one command that installs agentygg from PyPI (it needs Python 3.12 or later): pipx install --force agentygg ."
 elif have brew; then
-  PLAN="it takes two commands, say both: uv (Astral's Python tool installer) from Homebrew, then agentygg $LATEST from PyPI: brew install uv  then  $UV_CMD ."
+  PLAN="it takes two commands, say both: uv (Astral's Python tool installer) from Homebrew, then agentygg from PyPI: brew install uv  then  $UV_CMD ."
 elif have winget; then
-  PLAN="it takes two commands, say both: uv (Astral's Python tool installer) from winget, then, in a new terminal, agentygg $LATEST from PyPI: winget install --id astral-sh.uv -e  then  $UV_CMD ."
+  PLAN="it takes two commands, say both: uv (Astral's Python tool installer) from winget, then, in a new terminal, agentygg from PyPI: winget install --id astral-sh.uv -e  then  $UV_CMD ."
 else
   PLAN="neither uv, pipx nor a package manager is here, so the last resort is Agent'Ygg's installer script (it puts uv, Python 3.12 and the client in ~/.local, nothing else): $SCRIPT ."
 fi

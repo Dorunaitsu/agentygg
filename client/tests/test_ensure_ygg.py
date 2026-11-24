@@ -80,18 +80,21 @@ def test_a_missing_client_asks_the_user_first(tmp_path):
 
 def test_the_install_offer_follows_what_the_machine_has(tmp_path):
     uv = _run(tmp_path, None, ("uv",)).stdout
-    assert "uv tool install --force --python 3.12 agentygg==" in uv and "install.sh" not in uv
+    assert "uv tool install --force --python 3.12 agentygg" in uv and "install.sh" not in uv
     pipx = _run(tmp_path, None, ("pipx",)).stdout
-    assert "pipx install --force agentygg==" in pipx and "install.sh" not in pipx
+    assert "pipx install --force agentygg" in pipx and "install.sh" not in pipx
     brew = _run(tmp_path, None, ("brew",)).stdout
     assert "brew install uv" in brew and "uv tool install" in brew and "install.sh" not in brew
     bare = _run(tmp_path, None).stdout
     assert "last resort" in bare and "curl -fsSL https://agentygg.com/install.sh | sh" in bare
 
 
-def test_the_offered_version_is_the_client_version():
+def test_the_script_names_no_client_version():
+    """Codex hashes the whole plugin and asks to trust its hooks again on any change: a client
+    release must not touch it (2026-11-24)."""
+    script = SCRIPTS[0].read_text()
     version = (ROOT / "pyproject.toml").read_text().split('version = "')[1].split('"')[0]
-    assert f'LATEST="{version}"' in SCRIPTS[0].read_text()
+    assert "LATEST" not in script and "agentygg==" not in script and version not in script
 
 
 def test_a_relay_turn_is_left_alone(tmp_path):

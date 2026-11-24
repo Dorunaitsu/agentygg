@@ -39,6 +39,10 @@ CODEX_LEAD = (
     "carry on with what you were doing, if anything."
 )
 QUEUE_TIMEOUT_S = 60.0
+# `codex queue` also takes a message for a session that is closing, and keeps it until someone
+# resumes that session (seen live, 2026-11-24). A delivery only counts if the session is still
+# there this long after; otherwise the relay gets the message.
+SETTLE_S = 3.0
 
 
 def codex_exe() -> str:
@@ -183,7 +187,7 @@ def hook_main(stdin_text: str) -> int:
     async def go() -> int:
         gw = Gateway(ident, nonce=listen_nonce(agent_id))
         try:
-            return await follow(gw, out=out, alive=alive, shape=delivery)
+            return await follow(gw, out=out, alive=alive, shape=delivery, settle_s=SETTLE_S)
         finally:
             await gw.close()
 

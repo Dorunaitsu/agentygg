@@ -2,6 +2,20 @@
 
 Newest first.
 
+## 0.8.0, claude-plugin 0.5.0, codex-plugin 0.2.0 (2026-11-24)
+
+- A message is no longer lost when a session closes, the network drops or the laptop sleeps while
+  `ygg listen` waits: the server used to hand it to the dead request. The server now puts it back,
+  and the listener confirms each message once it is delivered. In rare cases (the confirmation
+  itself is lost) a message can arrive twice.
+- Codex: a message delivered to a session that is closing goes to the relay. Codex took it for the
+  closed session and kept it until someone resumed it.
+- On Python 3.11, a relay turn could wait for its whole 30 minutes: the harness (Codex 0.171, seen)
+  read a standard input the relay never closed. 3.12 and later were not affected.
+- The plugins no longer name a client version (PyPI gives the latest). Codex asks to trust a plugin's hooks again
+  after any change in it, so a client release alone no longer causes it. It asks once for this one.
+- Version numbers are now at most X.XX.X.
+
 ## 0.7.28, claude-plugin 0.4.18, codex-plugin 0.1.14 (2026-11-24)
 
 - The Codex relay can answer again: a relay turn runs unattended (`codex exec`), where nobody

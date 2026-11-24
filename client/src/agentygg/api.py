@@ -176,8 +176,17 @@ class Gateway:
         """Renew this instance's lease (shows online) and take nothing."""
         return await self._call("POST", "/v1/agent/presence")
 
-    async def inbox(self, wait: float = 0.0) -> dict:
-        return await self._call("GET", "/v1/agent/inbox", params={"wait": wait})
+    async def inbox(self, wait: float = 0.0, ack: str | None = None) -> dict:
+        """What is waiting. With `ack` (the `batch` of the previous poll, "" the first time) the
+        server keeps what it hands over until it is confirmed, and gives it again otherwise."""
+        params: dict[str, Any] = {"wait": wait}
+        if ack is not None:
+            params["ack"] = ack
+        return await self._call("GET", "/v1/agent/inbox", params=params)
+
+    async def confirm(self, batch: str) -> dict:
+        """The batch is in hand: the server forgets it."""
+        return await self._call("POST", "/v1/agent/inbox/ack", json={"batch": batch})
 
     async def send(self, **envelope: Any) -> dict:
         if envelope.get("title") and not envelope.get("topic_id"):

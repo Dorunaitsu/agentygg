@@ -145,7 +145,9 @@ class Relay:
             *turn.cmd,
             cwd=str(self.workdir),
             env={**self._env(prompt), **turn.env},
-            stdin=asyncio.subprocess.PIPE,
+            # Nothing to send: no pipe at all. Python 3.11 would leave it open, and a harness
+            # that reads a piped stdin to its end (Codex) would wait for the whole timeout.
+            stdin=asyncio.subprocess.DEVNULL if turn.stdin is None else asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
