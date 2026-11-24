@@ -327,7 +327,8 @@ class Relay:
                     self._backoff = min(self._backoff * 2, 60.0)
                     continue
                 log(f"gateway error ({e.detail}); retrying in {self._backoff:.0f}s")
-            except (OSError, TimeoutError) as e:
+            except (httpx.HTTPError, OSError, TimeoutError) as e:
+                # HTTPError: the sign-in's refresh met a deploy (502), which used to end the relay.
                 log(f"connection lost ({e.__class__.__name__}); retrying in {self._backoff:.0f}s")
             await asyncio.sleep(self._backoff)
             self._backoff = min(self._backoff * 2, 60.0)

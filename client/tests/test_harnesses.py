@@ -129,7 +129,44 @@ def test_service_argv_carries_the_harness(tmp_path, monkeypatch):
     assert "--harness-path" not in argv and argv[argv.index("--cmd") + 1] == "run-it"
 
 
-def test_opencode_run_with_injected_mcp_config():
+@pytest.mark.parametrize("said", ["opencode v2.3.2", "2.4.0", "3.0.1"])
+def test_opencode_2_runs_its_own_server_in_the_folder(monkeypatch, said):
+    """2.x has no --dir (the turn runs in the folder anyway), and its background server does not
+    see the MCP server given to this run (2.3.2: no agentygg tool at all): --standalone does."""
+    monkeypatch.setattr(harnesses, "_version_text", lambda exe: said)
+    t = harnesses.build("opencode").prepare("hi", MCP, "ses_1", ["--auto"], "/w")
+    assert "--dir" not in t.cmd and "--standalone" in t.cmd
+    assert t.cmd[t.cmd.index("--session") + 1] == "ses_1" and t.cmd[-1] == "--auto"
+    assert "agentygg" in json.loads(t.env["OPENCODE_CONFIG_CONTENT"])["mcp"]
+
+
+def test_opencode_version_is_asked_once(monkeypatch):
+    asked = []
+    monkeypatch.setattr(harnesses, "_version_text", lambda exe: asked.append(exe) or "2.4.0")
+    h = harnesses.build("opencode")
+    for _ in range(3):
+        h.prepare("hi", MCP, None, [], "/w")
+    assert len(asked) == 1
+
+
+def test_a_version_that_cannot_be_read_is_empty():
+    assert harnesses._version_text("/no/such/program") == ""
+
+
+def test_the_cli_inside_the_opencode_app_is_a_candidate(monkeypatch, tmp_path):
+    cli = tmp_path / "Library/Application Support/ai.opencode.desktop/cli/2.3.2-arm64/opencode-cli"
+    cli.parent.mkdir(parents=True)
+    cli.write_text("")
+    monkeypatch.setattr(harnesses.Path, "home", lambda: tmp_path)
+    seen = []
+    monkeypatch.setattr(harnesses, "find_executable", lambda n, c: seen.extend(c) or "/x")
+    harnesses.build("opencode").exe()
+    assert cli in seen
+
+
+@pytest.mark.parametrize("said", ["1.19.4", ""])
+def test_opencode_run_with_injected_mcp_config(monkeypatch, said):
+    monkeypatch.setattr(harnesses, "_version_text", lambda exe: said)
     h = harnesses.build("opencode")
     t = h.prepare("hi", MCP, "ses_1", ["--auto"], "/w")
     assert t.cmd[:4] == ["/bin/opencode", "run", "--format", "json"]
@@ -193,3 +230,16 @@ def test_harness_detected_from_the_process_tree():
     assert detect.from_ancestors(table, start=800) is None  # a folder name is not a harness
     assert detect.from_environment({"CLAUDECODE": "1"}) == "claude"
     assert detect.from_environment({}) is None
+
+
+def test_opencode_says_what_its_error_is():
+    """`opencode run --format json` nests it (1.19.4: an expired sign-in read as just "error")."""
+    h = harnesses.build("opencode")
+    for error, expected in (
+        ({"name": "UnknownError", "data": {"message": "Token refresh failed: 401"}}, "Token refresh"),
+        ({"message": "flat"}, "flat"),
+        ({"name": "ProviderAuthError", "data": {}}, "ProviderAuthError"),
+        ({}, "error"),
+    ):
+        r = h.parse(0, json.dumps({"type": "error", "sessionID": "s", "error": error}), "")
+        assert not r.ok and expected in r.summary

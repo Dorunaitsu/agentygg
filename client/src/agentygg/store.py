@@ -195,7 +195,28 @@ def decode_key(key: str) -> tuple[str, str]:
     return data["w"], data["a"]
 
 
+def _to_disk(path: Path) -> None:
+    """Push a file (or a folder's entries) out of the system's cache. Best effort: a file system
+    or a platform that cannot (a folder on Windows) changes nothing."""
+    full = None
+    with contextlib.suppress(ImportError):
+        import fcntl
+
+        full = getattr(fcntl, "F_FULLFSYNC", None)  # macOS: fsync alone stops at the drive's cache
+    with contextlib.suppress(OSError):
+        # Windows flushes only what is open for writing (and no folder at all).
+        fd = os.open(path, os.O_RDWR if os.name == "nt" else os.O_RDONLY)
+        try:
+            os.fsync(fd)
+            if full is not None:
+                fcntl.fcntl(fd, full)
+        finally:
+            os.close(fd)
+
+
 def save(identity: Identity) -> Path:
+    """Written through to the disk: a refresh token works once, so a power cut that brings the
+    old one back ends the sign-in (Claudeo, 2026-11-24)."""
     d = agents_dir()
     d.mkdir(parents=True, exist_ok=True)
     os.chmod(home(), 0o700)
@@ -204,7 +225,9 @@ def save(identity: Identity) -> Path:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(identity.__dict__, indent=2))
     os.chmod(tmp, 0o600)
+    _to_disk(tmp)
     tmp.replace(path)
+    _to_disk(d)
     return path
 
 

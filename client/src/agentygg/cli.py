@@ -232,6 +232,28 @@ def cmd_login(args) -> None:
     )
 
 
+def _sign_in_ended(ident) -> bool:
+    """Whether Agent'Ygg refuses this machine's sign-in for good. Out of reach, restarting or
+    busy elsewhere is not that."""
+    import httpx
+
+    from agentygg.api import Gateway, GatewayError
+
+    async def ask() -> bool:
+        gw = Gateway(ident)
+        try:
+            await gw.me()
+        except GatewayError as e:
+            return e.status == 401
+        except (httpx.HTTPError, OSError):
+            pass
+        finally:
+            await gw.close()
+        return False
+
+    return asyncio.run(ask())
+
+
 def cmd_connect(args) -> None:
     """One command: find the harness we run in, sign the agent in with a link, wire the
     harness, start the relay."""
@@ -280,6 +302,9 @@ def cmd_connect(args) -> None:
             print(f"This folder already belongs to @{ident.agent_id}.")
         except LookupError:
             ident = None
+    if ident is not None and _sign_in_ended(ident):
+        print(f"The sign-in of @{ident.agent_id} on this machine ended: signing in again.")
+        ident = None
     if ident is None:
         ident = _sign_in(
             args.api,

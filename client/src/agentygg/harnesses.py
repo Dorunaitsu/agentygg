@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
@@ -83,6 +85,22 @@ def find_executable(name: str, candidates: list[Path]) -> str:
         if cand.exists():
             return str(cand)
     raise FileNotFoundError(name)
+
+
+def _version_text(exe: str) -> str:
+    """What `exe --version` says; "" when it cannot be asked."""
+    try:
+        r = subprocess.run(
+            [exe, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return r.stdout.strip()
 
 
 def _home_bins(name: str) -> list[Path]:
@@ -353,12 +371,24 @@ class OpenCode(Harness):
     path: str | None = None
     kind = "opencode"
     resumable = True
+    _major: int | None = field(default=None, repr=False)
 
     def exe(self) -> str:
         try:
             return find_executable(
                 self.path or "opencode",
-                [*_home_bins("opencode"), Path.home() / ".opencode" / "bin" / "opencode"],
+                [
+                    *_home_bins("opencode"),
+                    Path.home() / ".opencode" / "bin" / "opencode",
+                    # The desktop app carries its own, one folder per version: the newest.
+                    *sorted(
+                        (
+                            Path.home() / "Library/Application Support/ai.opencode.desktop/cli"
+                        ).glob("*/opencode-cli"),
+                        key=lambda p: p.stat().st_mtime,
+                        reverse=True,
+                    ),
+                ],
             )
         except FileNotFoundError:
             raise FileNotFoundError(
@@ -368,6 +398,13 @@ class OpenCode(Harness):
 
     def describe(self) -> str:
         return f"OpenCode ({self.exe()})"
+
+    def major(self) -> int:
+        """The major version (1 when it cannot be read), asked once."""
+        if self._major is None:
+            m = re.search(r"(\d+)\.\d+\.\d+", _version_text(self.exe()))
+            self._major = int(m.group(1)) if m else 1
+        return self._major
 
     def prepare(self, prompt, mcp, session, extra, workdir):
         if not session:
@@ -382,7 +419,10 @@ class OpenCode(Harness):
                 }
             }
         }
-        cmd = [self.exe(), "run", "--format", "json", "--dir", workdir]
+        cmd = [self.exe(), "run", "--format", "json"]
+        # 2.x: no --dir any more (a turn runs in the folder), and `run` goes through a background
+        # server that does not see the MCP server given to this run: it needs its own.
+        cmd += ["--standalone"] if self.major() >= 2 else ["--dir", workdir]
         if session:
             cmd += ["--session", session]
         return Turn(
@@ -402,7 +442,9 @@ class OpenCode(Harness):
             if ev.get("type") == "text":
                 texts.append(((ev.get("part") or {}).get("text") or "").strip())
             elif ev.get("type") == "error":
-                error = ((ev.get("error") or {}).get("message") or "error").strip()
+                e = ev.get("error") or {}
+                nested = (e.get("data") or {}).get("message")
+                error = str(nested or e.get("message") or e.get("name") or "error").strip()
         ok = code == 0 and not error
         summary = (texts[-1] if texts else "") if ok else (error or err.strip())
         return TurnResult(ok, session or None, summary[:200])

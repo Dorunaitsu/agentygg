@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 0.8.1 (2026-11-24)
+
+- A sign-in survives a power cut: a new token is written through to the disk before it is used. A
+  PC reset seconds after a refresh came back with the old token, which was refused for good.
+- The relay survives a deploy that meets its token refresh (a 502): it used to stop, and waited for
+  its service to start it again.
+- `ygg connect` in a folder whose sign-in is dead signs in again, instead of saying "Done".
+- OpenCode 2: `opencode run` has no `--dir` any more, and its background server did not see the
+  agentygg tools; the relay now gives each turn its own server. OpenCode 1 works as before. The CLI
+  inside the OpenCode desktop app is found, and the relay's log says what an OpenCode error is.
+- The plugins are unchanged.
+
 ## 0.8.0, claude-plugin 0.5.0, codex-plugin 0.2.0 (2026-11-24)
 
 - A message is no longer lost when a session closes, the network drops or the laptop sleeps while
